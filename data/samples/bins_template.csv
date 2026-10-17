@@ -1,0 +1,11 @@
+code,name,ward_code,latitude,longitude,capacity_liters,waste_type,area_category,status,provenance
+BIN-NSK-001,Panchavati Karanja Market Bin,WARD-01,20.0082,73.7945,1200,organic,market,active,observed
+BIN-NSK-002,Ramkund Ghat North Bin,WARD-01,20.0071,73.7928,1500,general,pilgrimage,active,observed
+BIN-NSK-003,Canada Corner Commercial Bin,WARD-02,19.9985,73.7745,1100,recyclable,commercial,active,observed
+BIN-NSK-004,College Road Cafe Cluster Bin,WARD-02,20.0032,73.7621,800,recyclable,commercial,active,observed
+BIN-NSK-005,Nashik Road Railway Station Plaza,WARD-03,19.9542,73.8341,2000,general,commercial,active,observed
+BIN-NSK-006,CIDCO Trimurti Chowk Hub,WARD-04,19.9678,73.7512,1500,general,residential,active,observed
+BIN-NSK-007,Satpur Industrial Estate Gate 1,WARD-05,19.9823,73.7289,2400,hazardous,industrial,active,observed
+BIN-NSK-008,Gangapur Road Anandwalli Center,WARD-06,20.0215,73.7548,1000,organic,residential,active,observed
+BIN-NSK-009,Indira Nagar Jogging Track Bin,WARD-04,19.9632,73.7842,900,general,residential,active,observed
+BIN-NSK-010,Pathardi Phata Highway Junction,WARD-04,19.9482,73.7712,1800,general,commercial,active,observed

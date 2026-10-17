@@ -1,0 +1,157 @@
+{
+  "type": "FeatureCollection",
+  "name": "Nashik_Municipal_Corporation_Wards",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-01",
+        "name": "Panchavati",
+        "zone": "North Zone",
+        "population": 298450,
+        "area_sq_km": 34.5,
+        "census_year": 2011,
+        "description": "Historic, pilgrimage, and agricultural market center of Nashik across the Godavari River."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.7820, 20.0020],
+            [73.8150, 20.0050],
+            [73.8250, 20.0350],
+            [73.7950, 20.0450],
+            [73.7750, 20.0250],
+            [73.7820, 20.0020]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-02",
+        "name": "Nashik West",
+        "zone": "West Zone",
+        "population": 245100,
+        "area_sq_km": 28.2,
+        "census_year": 2011,
+        "description": "Education, commercial retail, College Road, and residential corridor."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.7500, 19.9850],
+            [73.7850, 19.9850],
+            [73.7820, 20.0150],
+            [73.7450, 20.0200],
+            [73.7500, 19.9850]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-03",
+        "name": "Nashik East",
+        "zone": "Central Zone",
+        "population": 280600,
+        "area_sq_km": 26.8,
+        "census_year": 2011,
+        "description": "High-density heritage city center, Dwarka circle, and Shalimar retail spine."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.7850, 19.9750],
+            [73.8200, 19.9750],
+            [73.8150, 20.0050],
+            [73.7820, 20.0020],
+            [73.7850, 19.9750]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-04",
+        "name": "CIDCO",
+        "zone": "South-West Zone",
+        "population": 312800,
+        "area_sq_km": 36.4,
+        "census_year": 2011,
+        "description": "Planned residential township, Trimurti Chowk, and commercial sub-centers."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.7350, 19.9400],
+            [73.7750, 19.9400],
+            [73.7750, 19.9750],
+            [73.7350, 19.9750],
+            [73.7350, 19.9400]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-05",
+        "name": "Satpur",
+        "zone": "Industrial Zone",
+        "population": 195400,
+        "area_sq_km": 42.1,
+        "census_year": 2011,
+        "description": "Nashik industrial heartland, MIDC estates, and manufacturing units along Trimbak Road."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.7050, 19.9650],
+            [73.7450, 19.9650],
+            [73.7450, 20.0100],
+            [73.7050, 20.0100],
+            [73.7050, 19.9650]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_code": "WARD-06",
+        "name": "Nashik Road",
+        "zone": "South-East Zone",
+        "population": 268900,
+        "area_sq_km": 38.6,
+        "census_year": 2011,
+        "description": "Major railway terminus, Bytco circle, India Security Press, and highway logistics hub."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.8050, 19.9250],
+            [73.8550, 19.9250],
+            [73.8550, 19.9700],
+            [73.8050, 19.9700],
+            [73.8050, 19.9250]
+          ]
+        ]
+      }
+    }
+  ]
+}

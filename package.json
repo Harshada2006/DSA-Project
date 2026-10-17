@@ -1,0 +1,33 @@
+{
+  "name": "eco-collect",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-Powered Smart Waste Collection and Route Optimization System for Nashik, Maharashtra",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run --workspace=apps/api dev",
+    "dev:web": "npm run --workspace=apps/web dev",
+    "build": "npm run build:shared && npm run build:ml && npm run build:cpp && npm run build:api && npm run build:web",
+    "build:shared": "npm run --workspace=packages/shared build",
+    "build:ml": "npm run --workspace=packages/ml build",
+    "build:api": "npm run --workspace=apps/api build",
+    "build:web": "npm run --workspace=apps/web build",
+    "build:cpp": "node scripts/build-cpp.js",
+    "compile:engine": "node scripts/build-cpp.js",
+    "test:cpp": "node scripts/test-cpp.js",
+    "test:engine": "node scripts/test-cpp.js",
+    "test:api": "npm run --workspace=apps/api test",
+    "test": "npm run test:cpp && npm run test:api",
+    "db:migrate": "npm run --workspace=apps/api db:migrate",
+    "db:push": "npm run --workspace=apps/api prisma -- db push",
+    "db:seed": "npm run --workspace=apps/api db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

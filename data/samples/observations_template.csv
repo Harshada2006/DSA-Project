@@ -1,0 +1,11 @@
+bin_code,fill_percentage,observed_at,observer_type,provenance,notes
+BIN-NSK-001,84.5,2026-10-17T08:30:00Z,sensor,observed,Morning market vegetable accumulation
+BIN-NSK-002,92.0,2026-10-17T09:15:00Z,manual_inspection,observed,High pilgrim rush near Ramkund
+BIN-NSK-003,58.0,2026-10-17T10:00:00Z,manual_inspection,observed,Commercial packaging boxes
+BIN-NSK-004,42.0,2026-10-17T11:00:00Z,sensor,observed,College area lunchtime rush
+BIN-NSK-005,88.0,2026-10-17T07:45:00Z,sensor,observed,High passenger footfall at platform plaza
+BIN-NSK-006,64.0,2026-10-17T12:00:00Z,citizen_report,observed,Trimurti chowk domestic waste
+BIN-NSK-007,76.5,2026-10-17T13:30:00Z,manual_inspection,observed,Industrial scrap accumulation
+BIN-NSK-008,35.0,2026-10-17T14:00:00Z,sensor,observed,Steady residential flow
+BIN-NSK-009,48.0,2026-10-17T15:00:00Z,manual_inspection,observed,Clean jogging area bin
+BIN-NSK-010,79.0,2026-10-17T16:00:00Z,sensor,observed,Highway food stall waste

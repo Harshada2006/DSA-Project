@@ -1,0 +1,6 @@
+ticket_no,category,description,ward_code,latitude,longitude,severity,reported_by,provenance
+TCK-2026-001,overflow,Bin overflowing with market organic scrap,WARD-01,20.0083,73.7946,critical,Sunil Shinde,observed
+TCK-2026-002,odor,Foul smell near river bank stairs,WARD-01,20.0072,73.7929,high,Pooja Kulkarni,observed
+TCK-2026-003,damaged_bin,Lid broken and pedal mechanism damaged,WARD-02,19.9986,73.7746,medium,Rahul Deshmukh,observed
+TCK-2026-004,illegal_dumping,Debris dumped behind commercial complex,WARD-04,19.9679,73.7513,high,Amit Joshi,observed
+TCK-2026-005,missed_collection,Morning truck did not arrive,WARD-06,20.0216,73.7549,medium,Kavita Patil,observed

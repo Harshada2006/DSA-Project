@@ -1,0 +1,268 @@
+// Prisma schema for Eco Collect
+// Configured to support SQLite for zero-friction local development and PostgreSQL with PostGIS
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("dispatcher") // admin, dispatcher, driver, citizen
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ward {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  code               String   @unique
+  zone               String
+  areaSqKm           Float
+  populationEstimated Int
+  censusYear         Int      @default(2011)
+  latitude           Float
+  longitude          Float
+  boundaryGeoJson    String?  // JSON string of polygon geometry
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  bins               Bin[]
+  complaints         Complaint[]
+}
+
+model Bin {
+  id                    String            @id @default(uuid())
+  code                  String            @unique
+  name                  String
+  wardId                String
+  ward                  Ward              @relation(fields: [wardId], references: [id])
+  latitude              Float
+  longitude             Float
+  capacityLiters        Float
+  wasteType             String            @default("general") // organic, recyclable, hazardous, general, electronic
+  areaCategory          String            @default("residential") // residential, commercial, market, industrial, pilgrimage
+  status                String            @default("active") // active, maintenance, full, archived
+  currentFillPercentage Float             @default(0.0)
+  lastObservedAt        DateTime?
+  lastCollectedAt       DateTime?
+  urgency               String            @default("low") // low, medium, high, critical
+  priorityScore         Float             @default(0.0)
+  provenance            String            @default("observed") // observed, imported, inferred, predicted, synthetic
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  observations          BinObservation[]
+  collections           CollectionEvent[]
+  routeStops            RouteStop[]
+  complaints            Complaint[]
+
+  @@index([wardId])
+  @@index([status])
+  @@index([urgency])
+}
+
+model BinObservation {
+  id             String   @id @default(uuid())
+  binId          String
+  bin            Bin      @relation(fields: [binId], references: [id], onDelete: Cascade)
+  fillPercentage Float
+  observedAt     DateTime @default(now())
+  observerType   String   @default("manual_inspection")
+  provenance     String   @default("observed")
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@index([binId])
+  @@index([observedAt])
+}
+
+model CollectionEvent {
+  id             String   @id @default(uuid())
+  binId          String
+  bin            Bin      @relation(fields: [binId], references: [id], onDelete: Cascade)
+  vehicleId      String?
+  vehicle        Vehicle? @relation(fields: [vehicleId], references: [id])
+  driverName     String
+  collectedAt    DateTime @default(now())
+  fillBefore     Float
+  fillAfter      Float    @default(0.0)
+  provenance     String   @default("observed")
+  status         String   @default("completed") // completed, partial, skipped
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@index([binId])
+  @@index([vehicleId])
+  @@index([collectedAt])
+}
+
+model Complaint {
+  id                 String    @id @default(uuid())
+  ticketNo           String    @unique
+  category           String    // overflow, odor, damaged_bin, illegal_dumping, missed_collection
+  description        String
+  wardId             String
+  ward               Ward      @relation(fields: [wardId], references: [id])
+  binId              String?
+  bin                Bin?      @relation(fields: [binId], references: [id])
+  latitude           Float
+  longitude          Float
+  photoUrl           String?
+  status             String    @default("open") // open, assigned, in_progress, resolved, rejected
+  severity           String    @default("medium") // low, medium, high, critical
+  reportedBy         String
+  assignedVehicleId  String?
+  assignedVehicle    Vehicle?  @relation(fields: [assignedVehicleId], references: [id])
+  resolutionNotes    String?
+  reportedAt         DateTime  @default(now())
+  resolvedAt         DateTime?
+  provenance         String    @default("observed")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([wardId])
+  @@index([status])
+  @@index([severity])
+}
+
+model Vehicle {
+  id               String            @id @default(uuid())
+  registrationNo   String            @unique
+  vehicleType      String            @default("compactor_truck")
+  capacityKg       Float             @default(3500.0)
+  currentLoadKg    Float             @default(0.0)
+  driverName       String
+  driverPhone      String?
+  status           String            @default("idle") // idle, en_route, collecting, maintenance, off_duty
+  trackingMode     String            @default("simulated") // simulated, real_gps
+  currentLatitude  Float             @default(19.9975)
+  currentLongitude Float             @default(73.7898)
+  lastGpsUpdate    DateTime          @default(now())
+  assignedRouteId  String?
+  notes            String?
+  provenance       String            @default("observed")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  collections      CollectionEvent[]
+  complaints       Complaint[]
+  routes           Route[]
+  locationUpdates  VehicleLocationUpdate[]
+}
+
+model VehicleLocationUpdate {
+  id          String   @id @default(uuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  latitude    Float
+  longitude   Float
+  speedKmph   Float?
+  mode        String   @default("simulated") // simulated, real_gps
+  recordedAt  DateTime @default(now())
+
+  @@index([vehicleId])
+  @@index([recordedAt])
+}
+
+model Route {
+  id                   String      @id @default(uuid())
+  vehicleId            String
+  vehicle              Vehicle     @relation(fields: [vehicleId], references: [id])
+  depotName            String
+  depotLatitude        Float
+  depotLongitude       Float
+  totalDistanceKm      Float
+  totalDurationMinutes Float
+  algorithmUsed        String
+  timeComplexity       String
+  pathGeoJson          String      // JSON string array of coordinate pairs
+  status               String      @default("planned") // planned, active, completed, cancelled
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  stops                RouteStop[]
+}
+
+model RouteStop {
+  id                       String   @id @default(uuid())
+  routeId                  String
+  route                    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stopOrder                Int
+  type                     String   // depot, bin
+  binId                    String?
+  bin                      Bin?     @relation(fields: [binId], references: [id])
+  name                     String
+  latitude                 Float
+  longitude                Float
+  demandKg                 Float    @default(0.0)
+  cumulativeDistanceMeters Float
+  cumulativeTimeMinutes    Float
+  status                   String   @default("pending") // pending, completed, skipped
+  createdAt                DateTime @default(now())
+
+  @@index([routeId])
+}
+
+model RoadNode {
+  id        String   @id
+  name      String
+  latitude  Float
+  longitude Float
+  wardId    String?
+  createdAt DateTime @default(now())
+}
+
+model RoadEdge {
+  id                String   @id
+  sourceNodeId      String
+  targetNodeId      String
+  distanceMeters    Float
+  travelTimeSeconds Float
+  roadName          String
+  oneWay            Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
+model DataSource {
+  id                   String   @id @default(uuid())
+  name                 String
+  sourceType           String   // government, open_source, municipal_feed, synthetic
+  url                  String?
+  licenseNotes         String?
+  coverage             String?
+  dateRange            String?
+  acceptedRowsCount    Int      @default(0)
+  rejectedRowsCount    Int      @default(0)
+  dataQualityWarnings  String?
+  lastImportedAt       DateTime @default(now())
+  createdAt            DateTime @default(now())
+}
+
+model MLModelRecord {
+  id                    String   @id @default(uuid())
+  version               String   @unique
+  modelType             String
+  featuresUsed          String   // JSON string array
+  trainingRecordsCount  Int
+  trainMae              Float
+  trainRmse             Float
+  testMae               Float
+  testRmse              Float
+  baselineMae           Float
+  baselineRmse          Float
+  improvementPercentage Float
+  weightsJson           String?  // JSON string serialized weights
+  isActive              Boolean  @default(false)
+  status                String   @default("candidate") // active, candidate, archived
+  provenance            String   @default("synthetic")
+  trainedAt             DateTime @default(now())
+  createdAt             DateTime @default(now())
+}
