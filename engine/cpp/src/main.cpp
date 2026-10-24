@@ -70,11 +70,10 @@ int handle_prioritize(const std::string& input_json) {
     PrioritizationWeights weights;
     if (root.is_object() && root.contains("weights")) {
         const auto& w = root["weights"];
-        weights.weight_threshold_proximity = w["threshold_proximity"].as_double(weights.weight_threshold_proximity);
-        weights.weight_predicted_urgency = w["predicted_urgency"].as_double(weights.weight_predicted_urgency);
-        weights.weight_complaint_severity = w["complaint_severity"].as_double(weights.weight_complaint_severity);
-        weights.weight_overdue_time = w["overdue_time"].as_double(weights.weight_overdue_time);
-        weights.weight_staleness_penalty = w["staleness_penalty"].as_double(weights.weight_staleness_penalty);
+        weights.weight_overflow_risk = w["overflow_risk"].as_double(w["weight_overflow_risk"].as_double(weights.weight_overflow_risk));
+        weights.weight_pickup_delay = w["pickup_delay"].as_double(w["weight_pickup_delay"].as_double(weights.weight_pickup_delay));
+        weights.weight_sensitive_location = w["sensitive_location"].as_double(w["weight_sensitive_location"].as_double(weights.weight_sensitive_location));
+        weights.weight_missed_pickups = w["missed_pickups"].as_double(w["weight_missed_pickups"].as_double(weights.weight_missed_pickups));
     }
 
     const auto& tasks_json = root.is_array() ? root : root["tasks"];
@@ -90,11 +89,13 @@ int handle_prioritize(const std::string& input_json) {
         task.ward_name = t["ward_name"].as_string("Nashik");
         task.latitude = t["latitude"].as_double(t["lat"].as_double(19.9975));
         task.longitude = t["longitude"].as_double(t["lng"].as_double(73.7898));
+        task.area_category = t["area_category"].as_string(t["areaCategory"].as_string("residential"));
         task.current_fill = t["current_fill"].as_double(t["currentFillPercentage"].as_double(0.0));
         task.predicted_fill = t["predicted_fill"].as_double(t["predictedFillPercentage"].as_double(task.current_fill));
-        task.time_to_threshold_hours = t["time_to_threshold_hours"].as_double(t["timeToThresholdHours"].as_double(24.0));
-        task.complaint_count = t["complaint_count"].as_int(t["complaintCount"].as_int(0));
         task.hours_since_last_collection = t["hours_since_last_collection"].as_double(24.0);
+        task.sensitive_location_factor = t["sensitive_location_factor"].as_double(t["sensitive_location"].as_double(-1.0));
+        task.missed_pickups_count = t["missed_pickups_count"].as_int(t["missedPickups"].as_int(0));
+        task.complaint_count = t["complaint_count"].as_int(t["complaintCount"].as_int(0));
         task.data_freshness_hours = t["data_freshness_hours"].as_double(2.0);
         task.provenance = t["provenance"].as_string("observed");
         tasks.push_back(task);
@@ -123,24 +124,33 @@ int handle_prioritize(const std::string& input_json) {
         item["ward_name"] = r.ward_name;
         item["latitude"] = r.latitude;
         item["longitude"] = r.longitude;
+        item["area_category"] = r.area_category;
         item["priority_score"] = r.priority_score;
-        item["urgency"] = r.urgency_level;
+        item["priority_category"] = r.priority_category;
+        item["urgency"] = r.priority_category;
         item["current_fill"] = r.current_fill;
         item["predicted_fill"] = r.predicted_fill;
-        item["time_to_threshold_hours"] = r.time_to_threshold_hours;
-        item["complaint_count"] = r.complaint_count;
         item["hours_since_last_collection"] = r.hours_since_last_collection;
+        item["missed_pickups_count"] = r.missed_pickups_count;
+        item["complaint_count"] = r.complaint_count;
         item["data_freshness_hours"] = r.data_freshness_hours;
+        item["reason_for_prioritization"] = r.reason_for_prioritization;
         item["suggested_action"] = r.suggested_action;
         item["provenance"] = r.provenance;
 
+        eco_json::Value normalized(eco_json::Type::Object);
+        normalized["overflow_risk"] = r.norm_overflow_risk;
+        normalized["pickup_delay"] = r.norm_pickup_delay;
+        normalized["sensitive_location"] = r.norm_sensitive_location;
+        normalized["missed_pickups"] = r.norm_missed_pickups;
+        item["normalized_factors"] = normalized;
+
         eco_json::Value breakdown(eco_json::Type::Object);
-        breakdown["threshold_proximity"] = r.comp_threshold_proximity;
-        breakdown["predicted_urgency"] = r.comp_predicted_urgency;
-        breakdown["complaint_severity"] = r.comp_complaint_severity;
-        breakdown["overdue_time"] = r.comp_overdue_time;
-        breakdown["freshness_discount"] = r.comp_freshness_discount;
-        item["formula_breakdown"] = breakdown;
+        breakdown["overflow_risk_contribution"] = r.contrib_overflow_risk;
+        breakdown["pickup_delay_contribution"] = r.contrib_pickup_delay;
+        breakdown["sensitive_location_contribution"] = r.contrib_sensitive_location;
+        breakdown["missed_pickups_contribution"] = r.contrib_missed_pickups;
+        item["factor_contributions"] = breakdown;
 
         tasks_arr.push_back(item);
     }

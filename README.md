@@ -1,305 +1,150 @@
-# Eco Collect 🌱
-### AI-Powered Smart Waste Collection and Route Optimization System for Nashik, Maharashtra
+# EcoNexus 🌱
+### Smart Waste Management & Collection System for Nashik, Maharashtra
+> *"Monitor municipal waste bins, prioritize overflow risks with C++17 DSA algorithms, and orchestrate civic collection logistics across Nashik."*
 
-[![C++17 Engine](https://img.shields.io/badge/C%2B%2B-17%20DSA%20Engine-blue.svg)](file:///engine/cpp)
-[![TypeScript Monorepo](https://img.shields.io/badge/TypeScript-5.3%20Monorepo-3178c6.svg)](file:///package.json)
-[![No Python Policy](https://img.shields.io/badge/Python-0%25%20Strict-brightgreen.svg)](#technology-stack--strict-constraints)
-[![TensorFlow.js](https://img.shields.io/badge/ML-TensorFlow.js%20(Pure%20TS)-ff6f00.svg)](file:///packages/ml)
+[![C++17 Engine](https://img.shields.io/badge/C%2B%2B-17%20DSA%20Engine-blue.svg)](#3-native-c17-dsa-engine)
+[![JavaScript Stack](https://img.shields.io/badge/JavaScript-100%25%20Pure%20JS-F7DF1E.svg?logo=javascript&logoColor=black)](#2-technology-stack--strict-constraints)
+[![Zero TypeScript](https://img.shields.io/badge/TypeScript-0%25-red.svg)](#2-technology-stack--strict-constraints)
+[![No Python Policy](https://img.shields.io/badge/Python-0%25%20Strict-brightgreen.svg)](#2-technology-stack--strict-constraints)
+[![Database: SQLite](https://img.shields.io/badge/Database-SQLite%20(Prisma)-003B57.svg)](#4-database--prisma-schema)
+[![Stakeholder Roles](https://img.shields.io/badge/Roles-3%20Distinct%20Stakeholders-059669.svg)](#5-three-distinct-stakeholder-roles)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](file:///LICENSE)
 
 ---
 
-## 1. Executive Summary & Objective
+## 1. Project Overview & Objective
 
-**Eco Collect** is an enterprise-grade municipal smart waste collection and route optimization platform engineered specifically for **Nashik Municipal Corporation (NMC)** in Maharashtra, India. The platform integrates:
-- **High-Performance C++17 DSA Engine**: Real-time multi-factor Max-Heap task prioritization and Dijkstra-based Traveling Salesperson Problem (TSP) road network route optimization communicating with Node.js via validated JSON STDIO subprocess IPC.
-- **Pure TypeScript Machine Learning**: 24-hour bin fill-level accumulation forecasting using TensorFlow.js neural regression without any Python runtime or target data leakage.
-- **Geospatial Command Center**: Interactive Leaflet maps rendering authentic Nashik municipal wards (Panchavati, CIDCO, Satpur, Nashik East, Nashik West, Nashik Road), real-time simulated vehicle telemetry, and dynamic bin clusters.
-- **Full Operational Workflows**: End-to-end bin lifecycle, citizen complaint triage, fleet tracking, and CSV audit importing with strict, honest data provenance labeling.
+**EcoNexus** is a production-grade smart civic technology and Data Structures & Algorithms (DSA) PBL platform engineered for the **Nashik Municipal Corporation (NMC)** in Maharashtra, India. It bridges real-world civic waste operations with computer science algorithms:
+
+- **Max-Heap 4-Factor Prioritization**: A native **C++17 Max-Heap (`std::priority_queue`)** dynamically ranks collection urgency across Nashik bins using a strictly normalized formula:
+  $$\text{priorityScore} = 0.40 \cdot \text{overflowRisk} + 0.25 \cdot \text{pickupDelay} + 0.20 \cdot \text{sensitiveLocationRisk} + 0.15 \cdot \text{missedPickupRisk}$$
+- **Shortest Path & Route Planning**: **Dijkstra's Algorithm** computes exact minimum distances across the Nashik road intersection graph ($O((V+E)\log V)$), combined with a **Greedy Nearest-Neighbor Multi-Stop Tour Heuristic** from NMC sanitation depots.
+- **Sensor-Free Rate Prediction**: Uses historical field collection timestamps and observation decay rather than claiming physical IoT sensors.
+- **Transparent Nashik Provenance**: Explicitly labels verified civic records (NMC Sanitary Reports 2023-24, Census 2011, MPCB Recycler Registry, OpenStreetMap graph) versus synthetic demo records.
+- **Three Genuine Stakeholder Portals**: Distinct, purpose-built workflows for **Organization Admins**, **Municipal Field Workers**, and **Nashik Citizens**.
 
 ---
 
 ## 2. Technology Stack & Strict Constraints
 
-> [!IMPORTANT]
-> **Strict Zero-Python Policy**: This project contains **0% Python**. All machine learning, data processing, backend services, and web frontends are implemented exclusively in **TypeScript / JavaScript (Node.js & TensorFlow.js)**, while algorithmic routing and priority scheduling are compiled natively in **C++17 (MinGW/GCC / Clang / MSVC)**.
-
-| Layer | Technologies | Role / Responsibilities |
+| Layer | Technology | Decision & Architecture |
 |---|---|---|
-| **DSA Engine** | C++17, STL (`std::priority_queue`, `std::vector`, `std::unordered_map`) | Dijkstra shortest paths, Greedy TSP heuristic, Multi-factor Max-Heap prioritization |
-| **Machine Learning** | `@tensorflow/tfjs`, Pure TypeScript | Linear accumulation baseline & Deep Neural Network fill forecasting |
-| **Backend API** | Node.js, Express, TypeScript, Prisma ORM, Zod, Swagger OpenAPI | REST endpoints, subprocess orchestration, DB transactions, Swagger docs |
-| **Database** | SQLite (zero-config local) & PostgreSQL + PostGIS (production spatial) | Relational persistence of bins, observations, complaints, routes, and road network |
-| **Frontend Web** | React 18, Vite, Tailwind CSS, TanStack Query, React Leaflet, Lucide Icons | Responsive command center UI across 11 fully functional operational modules |
-| **Shared Libraries** | `@eco-collect/shared`, `@eco-collect/ml` | Monorepo domain interfaces, validation schemas, and ML algorithms |
+| **DSA Engine** | **C++17** | Native binary (`eco_engine.exe`) using STL `<queue>`, `<vector>`, `<unordered_map>`, compiled with MinGW GCC. Connected to Node.js via JSON IPC over stdin/stdout. |
+| **Backend API** | **Node.js (ES Modules)** | Pure JavaScript (`.js`). Express 4, Prisma ORM, JWT, bcryptjs. **Zero TypeScript**. |
+| **Database** | **SQLite (Prisma)** | Zero-config local relational database (`apps/api/prisma/eco_collect.db`). |
+| **Frontend Web** | **React 18 + Vite** | Pure JavaScript JSX (`.jsx`, `.js`), Tailwind CSS, Lucide React, Recharts. **Zero TypeScript**. |
+| **Geospatial GIS** | **Leaflet + OpenStreetMap** | Real cartography centered on Nashik coordinates (19.9975° N, 73.7898° E). |
+| **Strict Constraints** | **0% Python, 0% TS** | No Python dependencies, no TypeScript in final code. Exactly 3 stakeholder roles (no NGO role). |
 
 ---
 
-## 3. High-Level Architecture Diagram
+## 3. Pre-Seeded Credentials for Testing
 
-```mermaid
-flowchart TB
-    subgraph Client["Frontend Web Application (Vite + React 18 + Tailwind)"]
-        UI["11 Interactive Modules\n(Overview, Map, Bins, ML, DSA Priority, Route TSP, etc.)"]
-        Leaflet["Leaflet GIS View\n(Wards, Road Graph, Bins, Vehicles)"]
-        ReactQuery["TanStack Query Cache"]
-    end
+| Role | Username / ID | Password | Access URL | Features |
+|---|---|---|---|---|
+| **Organization Admin** | `admin@econexus.gov.in` | `AdminPassword123!` | `/organization/login` | Full operations control room, C++ Priority Heap, C++ Route Optimizer, Bin Assets, Workers team, Grievance redressal, Recycler handovers, CSV/JSON exports. |
+| **Municipal Worker** | `WRK-NSK-101`<br>*(Org: `NMC-SWM`)* | `WorkerPassword123!` | `/worker/login` | Mobile-first field view, assigned collection tasks, record emptying with GPS consent, report missed/blocked bin, QR asset scanner simulator, e-waste pickups. |
+| **Citizen** | `citizen@econexus.gov.in`<br>*(or any email)* | *Passwordless OTP* | `/citizen/login` | Report waste grievance (generates ticket `#CMP-...`), track private reports timeline, interactive public map, book doorstep e-waste pickup, segregation guide. |
 
-    subgraph Backend["Express REST API (Node.js / TypeScript)"]
-        Router["Express API Router\n(/api/v1/* & /api/docs)"]
-        SubprocessRunner["C++ Subprocess IPC Runner\n(STDIO JSON with Zod validation)"]
-        MLService["TensorFlow.js Regression Service\n(Linear Baseline & Deep Net)"]
-        Prisma["Prisma ORM Client"]
-    end
-
-    subgraph Engine["Native C++17 DSA Engine (Compiled Binary)"]
-        Dijkstra["Dijkstra Shortest Path Engine\nO((V + E) log V)"]
-        MaxHeap["Multi-Factor Priority Queue\nstd::priority_queue O(N log N)"]
-        TSP["Greedy Nearest-Neighbor TSP\nGraph-constrained routing"]
-    end
-
-    subgraph Storage["Database Layer"]
-        DB[(SQLite / PostgreSQL + PostGIS\n22 Relations, Road Graph, GeoJSON)]
-    end
-
-    UI --> ReactQuery
-    ReactQuery --> Router
-    Router --> SubprocessRunner
-    Router --> MLService
-    Router --> Prisma
-    SubprocessRunner -->|JSON via Stdin| Engine
-    Engine -->|JSON via Stdout| SubprocessRunner
-    Prisma --> DB
-```
+> [!TIP]
+> In dev mode (`DEV_AUTH_MODE=true`), the Citizen login screen displays a **"Auto-Fill Dev OTP"** button so you can test citizen login in 1 click without needing an external SMTP email server!
+> Both Worker and Admin sign-in screens also provide a 1-click **"Quick Fill"** button for pre-seeded credentials.
 
 ---
 
-## 4. C++17 DSA Engine: Algorithms & Complexity Analysis
-
-The native DSA engine is located in [`engine/cpp`](file:///c:/Users/HARSHADA/OneDrive/Desktop/Learning_Hub/Antigravity/ECO_collect/engine/cpp) and compiles to a standalone high-speed executable (`eco_engine.exe` / `eco_engine`).
-
-### 1. Multi-Factor Task Prioritization (`priority_queue.hpp`)
-- **Data Structure**: Binary Max-Heap implemented via `std::priority_queue<PriorityTask, std::vector<PriorityTask>, TaskComparator>`.
-- **Ranking Formulation**:
-  $$\text{Priority Score} = w_f \cdot \left(\frac{\text{fill}}{\text{threshold}}\right) + w_u \cdot U + w_c \cdot \min(C, 5) + w_t \cdot \min(H, 48) + w_s \cdot \min(S, 24)$$
-  Where:
-  - $U$: Urgency rating ($\text{CRITICAL}=1.0$, $\text{HIGH}=0.75$, $\text{MEDIUM}=0.5$, $\text{LOW}=0.25$)
-  - $C$: Count of active citizen complaints linked to the bin
-  - $H$: Overdue collection hours
-  - $S$: Hours since last telemetry observation (staleness penalty)
-- **Time Complexity**:
-  - Task insertion: $\mathcal{O}(\log N)$
-  - Extracting top prioritized bins: $\mathcal{O}(K \log N)$
-  - Total batch ranking: $\mathcal{O}(N \log N)$
-- **Space Complexity**: $\mathcal{O}(N)$
-
-### 2. Road Network Dijkstra Shortest Path (`dijkstra.hpp` & `graph.hpp`)
-- **Data Structure**: Adjacency list representation of Nashik road intersections and segments with a min-priority queue (`std::priority_queue<std::pair<double, int>, ...>`).
-- **Path Reconstruction**: Back-pointer map storing predecessor nodes from destination back to origin.
-- **Time Complexity**:
-  $$\mathcal{O}((V + E) \log V)$$
-  Where $V$ is the number of road nodes (intersections) and $E$ is the number of directed road segments.
-- **Space Complexity**: $\mathcal{O}(V + E)$
-
-### 3. Route Optimization Heuristic (`route_optimizer.hpp`)
-- **Algorithm**: Graph-Constrained Greedy Nearest-Neighbor Heuristic for the Metric Traveling Salesperson Problem (TSP) with Haversine geometric fallback.
-- **Workflow**:
-  1. Starts at the municipal depot (e.g., NMC Central Workshop / CIDCO Division Depot).
-  2. Iteratively computes the shortest path to all remaining uncollected high-priority bins using Dijkstra over the actual road network graph.
-  3. Selects the bin with minimum road traversal cost, adds its path to the route polyline, and advances the current location.
-  4. Once all targets are serviced, solves the return path back to the depot or final disposal facility (Pathardi Landfill).
-- **Time Complexity**:
-  $$\mathcal{O}(K \cdot (V + E) \log V)$$
-  Where $K$ is the number of selected bins to collect ($K \le 50$).
-
----
-
-## 5. Machine Learning Pipeline (`@eco-collect/ml`)
-
-The ML package is implemented entirely in TypeScript using `@tensorflow/tfjs`.
-
-### Features & Leakage Prevention
-- **Features Extracted**:
-  1. `currentFill`: Current fill level (0.0 to 1.0)
-  2. `fillRatePerHour`: Historical fill velocity
-  3. `hourOfDayNorm`: Time of day cyclic feature ($\frac{\text{hour}}{24}$)
-  4. `dayOfWeekNorm`: Day of week cyclic feature ($\frac{\text{day}}{7}$)
-  5. `isCommercial`: Binary indicator of high-turnover market area
-  6. `isWeekend`: Binary indicator of weekend traffic
-- **Target Leakage Prohibition**: Feature extraction strictly uses historical observations recorded *prior* to prediction horizon. Future collection events or target fill levels are completely excluded from the training matrix.
-- **Chronological Split**: Observations are split sequentially by timestamp (80% train / 20% test) to prevent temporal data contamination.
-
-### Model Architectures & Evaluation
-- **Baseline Predictor**: Deterministic linear accumulation with boundary clamping and zero-variance detection.
-- **TensorFlow.js Deep Regression Network**:
-  - Dense Input Layer (6 features $\to$ 32 units, ReLU activation)
-  - Dropout Layer (rate: 0.1) for regularization
-  - Hidden Dense Layer (16 units, ReLU activation)
-  - Output Dense Layer (1 unit, Linear activation)
-  - Optimizer: Adam ($\text{lr} = 0.01$), Loss: Mean Squared Error
-  - Evaluation Metrics: Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE) in percentage points.
-
----
-
-## 6. Nashik Municipal Geography & Data Provenance
-
-### Municipal Divisions Represented
-1. **Panchavati (Ward 1)**: Historic temple zones, Ramkund, and Godavari Ghats (high commercial and pilgrim pedestrian footfall).
-2. **Nashik West (Ward 2)**: City center, CBS Central Bus Stand, and commercial retail corridors.
-3. **CIDCO (Ward 3)**: High-density planned residential sectors and commercial avenues.
-4. **Nashik Road (Ward 4)**: Nashik Road Railway Station hub and suburban commercial transit points.
-5. **Satpur (Ward 5)**: Industrial hub (MIDC) and surrounding worker residential colonies.
-6. **Nashik East (Ward 6)**: Residential communities and arterial connectivity towards Mumbai-Agra Highway.
-
-### Honest Data Provenance Standards
-All system interfaces explicitly display provenance badges:
-- 🟢 **REAL**: Authentic geographical boundaries, coordinates, and road networks from OpenStreetMap (OSM) and Nashik Municipal Corporation public open data.
-- 🟡 **SIMULATED**: Live GPS updates generated along actual road segments with speed and timestamp physics.
-- 🔵 **SYNTHETIC**: Historical sensor telemetry and synthetic training observations generated from empirical municipal accumulation patterns for testing and ML validation.
-
----
-
-## 7. Frontend User Interface Modules (11 Pages)
-
-The web dashboard is fully interactive and styled with modern design patterns:
-1. **Overview Dashboard** (`/`): High-level KPI stat cards, urgency distribution pie chart, 7-day municipal collection trends, live urgent bin table, and real-time C++ engine status.
-2. **Live Map** (`/map`): Fullscreen Leaflet GIS map with ward boundary GeoJSON rendering, bin markers colored by fill level, real-time GPS vehicle markers, and interactive inspection drawers.
-3. **Bin Management** (`/bins`): Searchable, filterable directory of all municipal bins with full CRUD modals (Add Bin, Edit Bin, Archive Bin, Record Observation).
-4. **Prediction Centre** (`/predictions`): Bin-by-bin 24-hour fill forecasts, threshold alert ETA predictions, and an interactive ML Training Playground for tuning epochs and learning rates.
-5. **Priority Queue** (`/priority-tasks`): Visual explanation of the C++ binary max-heap, live task priority ranking, formula weight tuning sliders, and execution benchmark displays.
-6. **Route Planner** (`/routes`): Interactive TSP route optimizer executing the C++ Dijkstra graph engine, generating turn-by-turn route stop tables, and rendering full polyline maps.
-7. **Citizen Complaints** (`/complaints`): Public grievance tracker with status badges, priority scoring, photo inspection modals, and resolution workflow dialogs.
-8. **Fleet & GPS Tracking** (`/vehicles`): Compactor and tipper tracking with simulated live GPS animation, battery/speed metrics, and manual vehicle dispatch controls.
-9. **Collection History** (`/collections`): Audit log of completed pickups, gross tonnage collected, driver names, before/after fill percentages, and CSV export capabilities.
-10. **Analytics & Reports** (`/analytics`): Deep-dive municipal operational reports with ward-by-ward comparisons, waste segregation breakdowns, and SLA response times.
-11. **Data Sources & Import** (`/data-sources`): Transparent inventory of Nashik open data catalogs, schema definitions, and a drag-and-drop CSV importer with live validation.
-
----
-
-## 8. Getting Started & Installation
+## 4. Quick Start & Execution
 
 ### Prerequisites
-- **Node.js**: Version 18.0.0 or later (`node -v`)
-- **npm**: Version 9.0.0 or later (`npm -v`)
-- **C++ Compiler**: GCC / MinGW `g++` (version 6.3+ or 9+ with C++17 support) or Clang / MSVC
+- **Node.js**: v18.0.0 or later
+- **MinGW GCC / g++** (or any C++17 compiler) to recompile the C++ engine if desired (`g++ --version`). Pre-compiled binaries `eco_engine.exe` and `eco_engine_tests.exe` are already included in `engine/cpp/bin/`.
 
-### Step 1: Clone & Install Dependencies
+### Step 1: Install Dependencies
 ```bash
-git clone https://github.com/your-username/eco-collect.git
-cd ECO_collect
-
-# Install all workspace dependencies across monorepo
 npm install
 ```
 
-### Step 2: Build Workspace Packages
+### Step 2: Initialize & Seed Database
 ```bash
-# Build TypeScript shared types and validation schemas
-npm run build:shared
-
-# Build TypeScript / TensorFlow.js machine learning package
-npm run build:ml
-```
-
-### Step 3: Compile Native C++17 DSA Engine
-```bash
-# Compiles engine/cpp/src/main.cpp -> engine/cpp/bin/eco_engine.exe
-npm run compile:engine
-
-# Run the C++ unit test suite to verify heap, Dijkstra, and TSP heuristics
-npm run test:engine
-```
-
-### Step 4: Initialize and Seed Database
-Eco Collect includes a pre-configured SQLite database with zero external installation friction:
-```bash
-# Push Prisma schema to local SQLite database
 npm run db:push
-
-# Seed database with authentic Nashik wards, bins, vehicles, and road graph
 npm run db:seed
 ```
 
-### Step 5: Run the Integration Tests
+### Step 3: Run Automated Test Suites
+Runs 100% C++ unit tests and all 11 API integration tests:
 ```bash
-# Execute API integration tests (verifies subprocess IPC, endpoints, and DB queries)
-npm run test:api
+npm test
 ```
 
-### Step 6: Start Development Servers
+### Step 4: Start Applications
+Runs both the REST API (port 4000) and Web Frontend (port 3000):
 ```bash
-# Run both Backend API (port 4000) and Web App (port 3000) concurrently
 npm run dev
 ```
-Alternatively, run them in separate terminals:
-```bash
-# Terminal 1: Backend Express API
-npm run dev:api
 
-# Terminal 2: Frontend Vite Web Application
-npm run dev:web
-```
-
-- **Frontend Web UI**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:4000/api/v1](http://localhost:4000/api/v1)
-- **Interactive Swagger Docs**: [http://localhost:4000/api/docs](http://localhost:4000/api/docs)
-- **API Health Check**: [http://localhost:4000/api/v1/health](http://localhost:4000/api/v1/health)
-- **C++ Subprocess Health**: [http://localhost:4000/api/v1/dsa/health](http://localhost:4000/api/v1/dsa/health)
+Visit the application in your browser:
+- **Public Portal & Landing Page**: [http://localhost:3000/](http://localhost:3000/)
+- **Citizen Portal**: [http://localhost:3000/citizen/login](http://localhost:3000/citizen/login)
+- **Field Worker Portal**: [http://localhost:3000/worker/login](http://localhost:3000/worker/login)
+- **Organization Admin Portal**: [http://localhost:3000/organization/login](http://localhost:3000/organization/login)
+- **REST API Health Endpoint**: [http://localhost:4000/api/v1/health](http://localhost:4000/api/v1/health)
 
 ---
 
-## 9. Project Directory Structure
+## 5. C++17 DSA Implementation Details
 
-```text
+### Priority Queue Max-Heap (`engine/cpp/include/priority_queue.hpp`)
+- Implements a custom comparator for `std::priority_queue`:
+  - Primary criterion: `priorityScore` descending.
+  - Secondary tie-breaking: `binCode` ascending (guarantees deterministic, reproducible ranking).
+- Four scoring components:
+  1. **Overflow Risk (40%)**: Current observed fill percentage normalized with linear accumulation rate.
+  2. **Pickup Delay (25%)**: Overdue hours elapsed since last collection normalized against a 72-hour ceiling.
+  3. **Sensitive Location Risk (20%)**: High penalty for pilgrimage sites (Ramkund, Panchavati Ghats), schools, hospitals, and vegetable mandis.
+  4. **Missed Pickup Risk (15%)**: Cumulative penalty for previously missed or blocked collection rounds.
+- Categorization thresholds:
+  - **Normal**: 0 – 39
+  - **Monitor**: 40 – 59
+  - **High**: 60 – 79
+  - **Critical**: 80 – 100
+
+### Dijkstra & Greedy TSP Route Optimizer (`engine/cpp/include/graph.hpp`, `route_optimizer.hpp`)
+- Ingests Nashik road network graph from OpenStreetMap (`data/samples/road_graph_nashik.json`).
+- Solves point-to-point shortest path via Dijkstra's Algorithm ($O((V+E)\log V)$).
+- Solves multi-stop municipal collection tours via Nearest-Neighbor Greedy Heuristic starting and finishing at NMC depots.
+
+---
+
+## 6. Project Architecture
+
+```
 ECO_collect/
 ├── apps/
-│   ├── api/                      # Express + TypeScript REST API Server
-│   │   ├── prisma/               # Prisma Schema & SQLite database
+│   ├── api/                     # Node.js + Express (Pure JavaScript ES Modules)
+│   │   ├── prisma/
+│   │   │   └── schema.prisma    # SQLite schema (User, Ward, Bin, Task, Complaint, EWaste, Facility)
 │   │   └── src/
-│   │       ├── config/           # Environment and C++ binary path resolver
-│   │       ├── database/         # Prisma client and comprehensive seed script
-│   │       ├── docs/             # Swagger / OpenAPI specification
-│   │       ├── engine/           # Subprocess IPC runner for C++ binary
-│   │       ├── routes/           # REST endpoints (bins, wards, dsa, ml, etc.)
-│   │       ├── services/         # Business logic services
-│   │       └── test/             # API integration test suite
-│   └── web/                      # React 18 + Vite + Tailwind CSS Frontend
+│   │       ├── database/        # Prisma client & seed.js with Nashik data
+│   │       ├── engine/          # cppSubprocess.js (JSON IPC over stdio)
+│   │       ├── routes/          # Express route controllers
+│   │       ├── services/        # Business logic & C++ engine invocation
+│   │       └── test/api.test.js # 11 Integration tests (Auth, DSA, Complaints, E-Waste)
+│   └── web/                     # React 18 + Vite (Pure JavaScript JSX)
 │       ├── src/
-│       │   ├── api/              # Strongly typed REST client
-│       │   ├── components/       # Reusable UI, Layout, Leaflet GIS components
-│       │   └── pages/            # 11 fully functional operational pages
-│       └── index.html            # Main HTML with Google Fonts & Leaflet styles
-├── data/
-│   └── samples/                  # Nashik GeoJSON wards, road graphs, CSV templates
-├── database/
-│   └── schema.sql                # Production PostGIS / PostgreSQL spatial schema
+│       │   ├── api/client.js    # Typed fetch API client
+│       │   ├── components/      # Badges, Cards, Modals, LeafletMap, BinDrawer
+│       │   ├── context/         # AuthContext.jsx
+│       │   └── pages/           # Dedicated Stakeholder Dashboards & Admin Views
 ├── engine/
-│   └── cpp/                      # C++17 DSA Optimization Engine
-│       ├── bin/                  # Compiled native binaries
-│       ├── include/              # Header-only graph, heap, Dijkstra, and JSON parser
-│       ├── src/main.cpp          # CLI entrypoint supporting JSON STDIO IPC
-│       └── tests/test_runner.cpp # Native C++ test harness
-├── packages/
-│   ├── ml/                       # Pure TypeScript TensorFlow.js ML package
-│   │   └── src/                  # Predictors, feature extractors, evaluations
-│   └── shared/                   # Monorepo shared types and Zod schemas
-│       └── src/
-├── package.json                  # Root npm workspaces config
-└── README.md                     # Master project documentation
+│   └── cpp/                     # C++17 DSA Engine
+│       ├── include/             # priority_queue.hpp, graph.hpp, route_optimizer.hpp
+│       ├── src/main.cpp         # stdio JSON IPC protocol
+│       ├── tests/               # C++ unit test runner
+│       └── bin/                 # eco_engine.exe & eco_engine_tests.exe
+├── data/samples/                # Nashik wards, bins, facilities, OSM road graph
+└── scripts/                     # build-cpp.js and test-cpp.js automation
 ```
 
 ---
 
-## 10. Verification & Test Summary
-
-| Component | Test Suite | Status | Execution Command |
-|---|---|---|---|
-| **C++17 Engine** | `test_runner.cpp` (Heap, Dijkstra, TSP, JSON Parser) | **100% Passed** | `npm run test:engine` |
-| **Backend API** | `api.test.ts` (Subprocess IPC, Bins, Priority, Route) | **100% Passed (7/7)** | `npm run test:api` |
-| **Frontend Web** | TypeScript Compiler (`tsc`) & Vite Production Build | **100% Passed** | `npm run build:web` |
-| **Shared & ML** | TypeScript Typecheck & Compilation | **100% Passed** | `npm run build:shared && npm run build:ml` |
-
----
-
-## 11. License & Academic Attribution
-Developed for educational, municipal research, and smart city applications under the MIT License. Tailored for the Nashik Municipal Corporation (NMC) geographic boundary and civic waste management infrastructure.
+## 7. License
+Developed for academic demonstration and municipal civic technology coursework under the MIT License.

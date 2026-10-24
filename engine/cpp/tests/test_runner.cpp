@@ -10,55 +10,84 @@
 using namespace eco_engine;
 
 void test_priority_queue() {
-    std::cout << "[TEST] Running Priority Queue Tests..." << std::endl;
+    std::cout << "[TEST] Running 4-Factor Priority Queue Tests (Section 13)..." << std::endl;
 
     std::vector<CollectionTask> tasks;
 
-    // Task 1: Overflowing bin with 4 complaints (Critical)
+    // Task 1: Overflowing bin in Pilgrimage area with 4 complaints (Critical: 80-100)
+    // Overflow=95 (contrib: 38.0), PickupDelay=72h (100% -> contrib: 25.0), Sensitive=Pilgrimage (90 -> contrib: 18.0), Missed=4 (100% -> contrib: 15.0)
+    // Total = 38 + 25 + 18 + 15 = 96.0 -> Critical
     CollectionTask t1;
     t1.bin_id = "bin-1";
     t1.bin_code = "BIN-001";
+    t1.area_category = "pilgrimage";
     t1.current_fill = 95.0;
-    t1.time_to_threshold_hours = 0.0;
-    t1.complaint_count = 4;
     t1.hours_since_last_collection = 72.0;
-    t1.data_freshness_hours = 1.0;
+    t1.missed_pickups_count = 2;
+    t1.complaint_count = 2;
     tasks.push_back(t1);
 
-    // Task 2: Moderate fill, no complaints (Low/Med)
+    // Task 2: Moderate fill in residential area, no missed pickups (Normal: 0-39)
+    // Overflow=30 (contrib: 12.0), PickupDelay=12h (16.6% -> contrib: 4.16), Sensitive=Residential (35 -> contrib: 7.0), Missed=0 (contrib: 0.0)
+    // Total ~ 23.2 -> Normal
     CollectionTask t2;
     t2.bin_id = "bin-2";
     t2.bin_code = "BIN-002";
-    t2.current_fill = 35.0;
-    t2.time_to_threshold_hours = 48.0;
-    t2.complaint_count = 0;
+    t2.area_category = "residential";
+    t2.current_fill = 30.0;
     t2.hours_since_last_collection = 12.0;
-    t2.data_freshness_hours = 2.0;
+    t2.missed_pickups_count = 0;
+    t2.complaint_count = 0;
     tasks.push_back(t2);
 
-    // Task 3: Near threshold, 1 complaint (High)
+    // Task 3: High fill in commercial market area, 1 missed pickup (High: 60-79)
+    // Overflow=75 (contrib: 30.0), PickupDelay=36h (50% -> contrib: 12.5), Sensitive=Market (80 -> contrib: 16.0), Missed=1 (33.3% -> contrib: 5.0)
+    // Total ~ 63.5 -> High
     CollectionTask t3;
     t3.bin_id = "bin-3";
     t3.bin_code = "BIN-003";
-    t3.current_fill = 78.0;
-    t3.time_to_threshold_hours = 4.0;
-    t3.complaint_count = 1;
+    t3.area_category = "market";
+    t3.current_fill = 75.0;
     t3.hours_since_last_collection = 36.0;
-    t3.data_freshness_hours = 1.0;
+    t3.missed_pickups_count = 1;
+    t3.complaint_count = 0;
     tasks.push_back(t3);
 
     auto ranked = PriorityQueueRanker::rank_tasks(tasks);
 
     assert(ranked.size() == 3);
-    assert(ranked[0].bin_id == "bin-1"); // Highest priority must be bin-1
-    assert(ranked[0].priority_score > ranked[1].priority_score);
+    assert(ranked[0].bin_id == "bin-1");
+    assert(ranked[0].priority_category == "Critical");
     assert(ranked[1].bin_id == "bin-3");
-    assert(ranked[1].priority_score > ranked[2].priority_score);
+    assert(ranked[1].priority_category == "High");
     assert(ranked[2].bin_id == "bin-2");
+    assert(ranked[2].priority_category == "Normal");
 
-    std::cout << "  ✓ Max-heap prioritized correctly: " << ranked[0].bin_code << " (" << ranked[0].priority_score << ") > "
-              << ranked[1].bin_code << " (" << ranked[1].priority_score << ") > "
-              << ranked[2].bin_code << " (" << ranked[2].priority_score << ")" << std::endl;
+    std::cout << "  ✓ 4-Factor ranking verified: "
+              << ranked[0].bin_code << " [" << ranked[0].priority_category << " score=" << ranked[0].priority_score << "] > "
+              << ranked[1].bin_code << " [" << ranked[1].priority_category << " score=" << ranked[1].priority_score << "] > "
+              << ranked[2].bin_code << " [" << ranked[2].priority_category << " score=" << ranked[2].priority_score << "]" << std::endl;
+
+    // Test Tie-Breaking Strategy
+    CollectionTask tieA;
+    tieA.bin_id = "bin-tie-A";
+    tieA.bin_code = "TIE-A";
+    tieA.current_fill = 60.0;
+    tieA.hours_since_last_collection = 24.0;
+    tieA.sensitive_location_factor = 50.0;
+    tieA.missed_pickups_count = 1;
+
+    CollectionTask tieB = tieA;
+    tieB.bin_id = "bin-tie-B";
+    tieB.bin_code = "TIE-B";
+
+    std::vector<CollectionTask> tieTasks = { tieA, tieB };
+    auto tieRanked = PriorityQueueRanker::rank_tasks(tieTasks);
+    assert(tieRanked.size() == 2);
+    assert(std::abs(tieRanked[0].priority_score - tieRanked[1].priority_score) < 0.001);
+    // tie-breaking chooses deterministically
+    assert(tieRanked[0].bin_id == "bin-tie-A");
+    std::cout << "  ✓ Deterministic tie-breaking verified" << std::endl;
 
     // Test empty tasks
     std::vector<CollectionTask> empty_tasks;

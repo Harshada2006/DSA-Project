@@ -1,5 +1,6 @@
-// Prisma schema for Eco Collect
-// Configured to support SQLite for zero-friction local development and PostgreSQL with PostGIS
+// Prisma schema for EcoNexus
+// Smart Waste Management & Collection System for Nashik, Maharashtra
+// Configured for SQLite with strict constraints, indexes, and full relational integrity
 
 datasource db {
   provider = "sqlite"
@@ -10,31 +11,135 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ---------------------------------------------------------------------
+// 1. AUTHENTICATION & STAKEHOLDER IDENTITY (3 Roles Only)
+// ---------------------------------------------------------------------
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("dispatcher") // admin, dispatcher, driver, citizen
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String         @id @default(uuid())
+  email           String         @unique
+  password        String?        // Nullable for passwordless OTP citizen accounts
+  name            String
+  role            String         @default("CITIZEN") // Exactly: ORGANIZATION_ADMIN, WORKER, CITIZEN
+  status          String         @default("active")  // active, pending, disabled
+  organizationId  String?
+  organization    Organization?  @relation(fields: [organizationId], references: [id])
+  workerProfile   WorkerProfile?
+  complaints      Complaint[]
+  ewasteRequests  EWasteRequest[]
+  assignedTasks   CollectionTask[]
+  assignedEWaste  EWasteRequest[] @relation("AssignedWorker")
+  auditLogs       AuditLog[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([role])
+  @@index([status])
 }
 
+model Organization {
+  id              String         @id @default(uuid())
+  name            String         @unique
+  code            String         @unique // e.g. NMC-SWM
+  orgType         String         @default("municipal_corporation") // municipal_corporation, authorized_contractor
+  officialEmail   String
+  phone           String?
+  address         String?
+  city            String         @default("Nashik")
+  status          String         @default("approved") // approved, suspended
+  users           User[]
+  workers         WorkerProfile[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model OrganizationRegistrationRequest {
+  id                  String     @id @default(uuid())
+  organizationName    String
+  organizationType    String
+  officialWorkEmail   String
+  adminName           String
+  contactPhone        String
+  verificationDetails String?
+  reasonForRequest    String
+  status              String     @default("pending") // pending, approved, rejected
+  reviewedBy          String?
+  reviewNotes         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([status])
+}
+
+model WorkerProfile {
+  id                       String       @id @default(uuid())
+  userId                   String       @unique
+  user                     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId           String
+  organization             Organization @relation(fields: [organizationId], references: [id])
+  workerId                 String       @unique // Unique Employee/Worker ID (e.g. WRK-NSK-101)
+  orgCode                  String       // Matching organization code (e.g. NMC-SWM)
+  phone                    String?
+  assignedWard             String?
+  vehicleType              String?      // compactor_truck, tipper_truck, e_rickshaw, mini_truck
+  isActivated              Boolean      @default(false)
+  activationToken          String?
+  activationTokenExpiresAt DateTime?
+  status                   String       @default("active") // active, on_leave, revoked
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  @@index([workerId])
+  @@index([orgCode])
+}
+
+model EmailVerificationToken {
+  id         String   @id @default(uuid())
+  email      String
+  otpCode    String   // 6-digit OTP code or cryptographic hash
+  token      String   @unique
+  purpose    String   // citizen_signup, citizen_login, worker_activation, password_reset
+  expiresAt  DateTime
+  isUsed     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // e.g. USER_PROVISIONED, BIN_CREATED, COMPLAINT_RESOLVED
+  resource   String
+  resourceId String?
+  details    String?  // JSON stringified payload
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------
+// 2. MUNICIPAL WARDS & ASSETS
+// ---------------------------------------------------------------------
 model Ward {
-  id                 String   @id @default(uuid())
-  name               String   @unique
-  code               String   @unique
-  zone               String
-  areaSqKm           Float
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  code                String               @unique
+  zone                String
+  areaSqKm            Float
   populationEstimated Int
-  censusYear         Int      @default(2011)
-  latitude           Float
-  longitude          Float
-  boundaryGeoJson    String?  // JSON string of polygon geometry
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  bins               Bin[]
-  complaints         Complaint[]
+  censusYear          Int                  @default(2011)
+  latitude            Float
+  longitude           Float
+  boundaryGeoJson     String?              // GeoJSON polygon geometry string
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  bins                Bin[]
+  complaints          Complaint[]
+  schedules           CollectionSchedule[]
 }
 
 model Bin {
@@ -52,7 +157,7 @@ model Bin {
   currentFillPercentage Float             @default(0.0)
   lastObservedAt        DateTime?
   lastCollectedAt       DateTime?
-  urgency               String            @default("low") // low, medium, high, critical
+  urgency               String            @default("normal") // normal, monitor, high, critical
   priorityScore         Float             @default(0.0)
   provenance            String            @default("observed") // observed, imported, inferred, predicted, synthetic
   notes                 String?
@@ -60,12 +165,14 @@ model Bin {
   updatedAt             DateTime          @updatedAt
   observations          BinObservation[]
   collections           CollectionEvent[]
+  tasks                 CollectionTask[]
   routeStops            RouteStop[]
   complaints            Complaint[]
 
   @@index([wardId])
   @@index([status])
   @@index([urgency])
+  @@index([wasteType])
 }
 
 model BinObservation {
@@ -74,13 +181,45 @@ model BinObservation {
   bin            Bin      @relation(fields: [binId], references: [id], onDelete: Cascade)
   fillPercentage Float
   observedAt     DateTime @default(now())
-  observerType   String   @default("manual_inspection")
+  observerType   String   @default("manual_inspection") // manual_inspection, citizen_report, sensor, synthetic_generator
   provenance     String   @default("observed")
   notes          String?
   createdAt      DateTime @default(now())
 
   @@index([binId])
   @@index([observedAt])
+}
+
+// ---------------------------------------------------------------------
+// 3. WORKER COLLECTION TASKS & OPERATIONS
+// ---------------------------------------------------------------------
+model CollectionTask {
+  id                 String    @id @default(uuid())
+  binId              String
+  bin                Bin       @relation(fields: [binId], references: [id], onDelete: Cascade)
+  assignedWorkerId   String?
+  assignedWorker     User?     @relation(fields: [assignedWorkerId], references: [id])
+  vehicleId          String?
+  taskPriority       String    @default("normal") // normal, monitor, high, critical
+  priorityScore      Float     @default(0.0)
+  status             String    @default("pending") // pending, assigned, started, collected, partially_completed, missed, blocked
+  scheduledDate      DateTime  @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  observedFill       Float?
+  collectedWeightKg  Float?
+  notes              String?
+  missedReason       String?
+  photoEvidenceUrl   String?
+  workerGpsLat       Float?
+  workerGpsLng       Float?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([binId])
+  @@index([assignedWorkerId])
+  @@index([status])
+  @@index([scheduledDate])
 }
 
 model CollectionEvent {
@@ -103,35 +242,198 @@ model CollectionEvent {
   @@index([collectedAt])
 }
 
+// ---------------------------------------------------------------------
+// 4. CITIZEN COMPLAINT MANAGEMENT
+// ---------------------------------------------------------------------
 model Complaint {
-  id                 String    @id @default(uuid())
-  ticketNo           String    @unique
-  category           String    // overflow, odor, damaged_bin, illegal_dumping, missed_collection
+  id                 String            @id @default(uuid())
+  ticketNo           String            @unique
+  citizenId          String?
+  citizen            User?             @relation(fields: [citizenId], references: [id])
+  category           String            // overflowing_bin, illegal_dumping, damaged_bin, missed_collection, uncollected_waste, other
   description        String
   wardId             String
-  ward               Ward      @relation(fields: [wardId], references: [id])
+  ward               Ward              @relation(fields: [wardId], references: [id])
   binId              String?
-  bin                Bin?      @relation(fields: [binId], references: [id])
+  bin                Bin?              @relation(fields: [binId], references: [id])
+  addressText        String?
   latitude           Float
   longitude          Float
   photoUrl           String?
-  status             String    @default("open") // open, assigned, in_progress, resolved, rejected
-  severity           String    @default("medium") // low, medium, high, critical
+  status             String            @default("submitted") // submitted, under_review, assigned, in_progress, resolved, rejected
+  severity           String            @default("medium") // low, medium, high, critical
   reportedBy         String
   assignedVehicleId  String?
-  assignedVehicle    Vehicle?  @relation(fields: [assignedVehicleId], references: [id])
+  assignedVehicle    Vehicle?          @relation(fields: [assignedVehicleId], references: [id])
   resolutionNotes    String?
-  reportedAt         DateTime  @default(now())
+  reportedAt         DateTime          @default(now())
   resolvedAt         DateTime?
-  provenance         String    @default("observed")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  provenance         String            @default("observed")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  updates            ComplaintUpdate[]
 
+  @@index([citizenId])
   @@index([wardId])
   @@index([status])
   @@index([severity])
 }
 
+model ComplaintUpdate {
+  id             String    @id @default(uuid())
+  complaintId    String
+  complaint      Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  previousStatus String
+  newStatus      String
+  publicComment  String    // Safe for citizen review
+  internalNotes  String?   // Admin/worker private notes
+  updatedBy      String
+  createdAt      DateTime  @default(now())
+
+  @@index([complaintId])
+}
+
+// ---------------------------------------------------------------------
+// 5. E-WASTE & DESTINATION FACILITIES (Managed by Admin & Workers)
+// ---------------------------------------------------------------------
+model Facility {
+  id                      String           @id @default(uuid())
+  name                    String
+  facilityType            String           @default("verified_ewaste_recycler") // general_waste_facility, verified_ewaste_recycler, composting_plant, transfer_station
+  address                 String
+  latitude                Float
+  longitude               Float
+  acceptedWasteCategories String           // JSON array string e.g. ["electronic", "battery"]
+  authorizationNumber     String?          // Official MPCB authorization certificate
+  authorizationValidUntil DateTime?
+  verificationStatus      String           @default("verified") // verified, pending_verification, unverified
+  sourceOrganization      String           @default("Maharashtra Pollution Control Board (MPCB)")
+  sourceUrl               String?
+  contactPerson           String?
+  contactPhone            String?
+  provenance              String           @default("imported")
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  handovers               HandoverRecord[]
+
+  @@index([facilityType])
+  @@index([verificationStatus])
+}
+
+model EWasteRequest {
+  id                   String           @id @default(uuid())
+  ticketNo             String           @unique
+  citizenId            String?
+  citizen              User?            @relation(fields: [citizenId], references: [id])
+  citizenName          String
+  citizenEmail         String
+  contactPhone         String
+  pickupAddress        String
+  wardId               String?
+  latitude             Float?
+  longitude            Float?
+  itemsDescription     String           // Specific items: e.g. 2 CRT monitors, 1 microwave
+  approximateQuantity  String           // e.g. "Small bag", "Large appliance"
+  estimatedWeightKg    Float?
+  preferredPickupDate  DateTime?
+  status               String           @default("submitted") // submitted, under_review, assigned, in_progress, collected, delivered_to_recycler, rejected
+  assignedWorkerId     String?
+  assignedWorker       User?            @relation("AssignedWorker", fields: [assignedWorkerId], references: [id])
+  assignedFacilityId   String?
+  collectionDate       DateTime?
+  resolutionNotes      String?
+  provenance           String           @default("observed")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  handovers            HandoverRecord[]
+
+  @@index([citizenId])
+  @@index([assignedWorkerId])
+  @@index([status])
+}
+
+model HandoverRecord {
+  id                   String         @id @default(uuid())
+  facilityId           String
+  facility             Facility       @relation(fields: [facilityId], references: [id])
+  ewasteRequestId      String?
+  ewasteRequest        EWasteRequest? @relation(fields: [ewasteRequestId], references: [id])
+  recordedByWorkerId   String
+  materialCategory     String         @default("e_waste")
+  measuredWeightKg     Float
+  receiptNumber        String?
+  certificateUrl       String?
+  notes                String?
+  handoverDate         DateTime       @default(now())
+  provenance           String         @default("observed")
+  createdAt            DateTime       @default(now())
+
+  @@index([facilityId])
+  @@index([ewasteRequestId])
+}
+
+// ---------------------------------------------------------------------
+// 6. SYSTEM ALERTS (Deduplicated & Managed)
+// ---------------------------------------------------------------------
+model Alert {
+  id          String    @id @default(uuid())
+  alertType   String    // predicted_overflow, high_priority, overdue_pickup, repeated_missed, damaged_bin
+  severity    String    @default("high") // critical, high, medium, low
+  binId       String?
+  wardId      String?
+  title       String
+  description String
+  status      String    @default("active") // active, acknowledged, resolved
+  dedupKey    String    @unique // Unique key preventing repetitive alert spam
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([alertType])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------
+// 7. SCHEDULES & FESTIVALS / SPECIAL EVENTS
+// ---------------------------------------------------------------------
+model CollectionSchedule {
+  id          String   @id @default(uuid())
+  wardId      String
+  ward        Ward     @relation(fields: [wardId], references: [id])
+  shiftName   String   // Morning Shift, Afternoon Shift, Night Commercial
+  startTime   String   // e.g. 06:30
+  endTime     String   // e.g. 11:30
+  daysOfWeek  String   // Monday, Wednesday, Friday
+  frequency   String   @default("Daily")
+  wasteType   String   @default("general")
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([wardId])
+}
+
+model FestivalEvent {
+  id                               String   @id @default(uuid())
+  eventName                        String   // Kumbh Mela Parvani, Ganesh Visarjan, Diwali Week
+  affectedLocation                 String   // Godavari Ghats, Ramkund, Panchavati
+  startDate                        DateTime
+  endDate                          DateTime
+  expectedActivityLevel            String   @default("high") // critical, high, medium
+  wasteCategoriesAffected          String   @default("organic, general")
+  demandMultiplier                 Float    @default(1.5) // Assumed demand factor
+  additionalCollectionRequirements String?
+  isPlanningAssumption             Boolean  @default(true)
+  notes                            String?
+  createdAt                        DateTime @default(now())
+
+  @@index([startDate])
+  @@index([endDate])
+}
+
+// ---------------------------------------------------------------------
+// 8. VEHICLES, ROUTING & ROAD NETWORK
+// ---------------------------------------------------------------------
 model Vehicle {
   id               String            @id @default(uuid())
   registrationNo   String            @unique
@@ -231,6 +533,9 @@ model RoadEdge {
   @@index([targetNodeId])
 }
 
+// ---------------------------------------------------------------------
+// 9. DATA PROVENANCE & RECORD RETENTION
+// ---------------------------------------------------------------------
 model DataSource {
   id                   String   @id @default(uuid())
   name                 String
