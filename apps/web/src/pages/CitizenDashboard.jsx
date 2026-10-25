@@ -19,9 +19,13 @@ import {
   Building2,
   ExternalLink,
 } from 'lucide-react';
+import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
+import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 export const CitizenDashboard = () => {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('report'); // 'report' | 'my-complaints' | 'map' | 'ewaste' | 'my-ewaste' | 'guide'
 
   // Data state
@@ -215,7 +219,9 @@ export const CitizenDashboard = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <LanguageSelector />
+            <ThemeToggle />
             <div className="hidden sm:block text-right">
               <span className="block text-sm font-bold text-white">{user?.name || 'Citizen Resident'}</span>
               <span className="block text-xs text-slate-400">{user?.email}</span>
@@ -225,7 +231,7 @@ export const CitizenDashboard = () => {
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
+              <span>{t('sign_out', 'Sign Out')}</span>
             </button>
           </div>
         </div>

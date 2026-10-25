@@ -464,7 +464,7 @@ export class AuthService {
         role: 'WORKER',
         workerId: workerProfile.workerId,
         orgCode: workerProfile.orgCode,
-        organizationName: workerProfile.organization.name,
+        organizationName: workerProfile.organization?.name || 'Nashik Municipal Corporation',
         assignedWard: workerProfile.assignedWard,
         vehicleType: workerProfile.vehicleType,
       },
@@ -478,7 +478,7 @@ export class AuthService {
     const { workerId, activationToken, newPassword, confirmPassword } = data;
 
     if (!workerId || !activationToken || !newPassword) {
-      throw new Error('Worker ID, activation token, and new password are required.');
+      throw new Error('Worker ID or work email, activation token, and new password are required.');
     }
 
     if (newPassword.length < 8) {
@@ -489,12 +489,15 @@ export class AuthService {
       throw new Error('Password confirmation does not match.');
     }
 
-    const cleanWorkerId = workerId.trim().toUpperCase();
+    const cleanWorkerId = workerId.trim();
     const cleanToken = activationToken.trim();
 
     const workerProfile = await prisma.workerProfile.findFirst({
       where: {
-        workerId: cleanWorkerId,
+        OR: [
+          { workerId: cleanWorkerId.toUpperCase() },
+          { user: { email: cleanWorkerId.toLowerCase() } },
+        ],
         activationToken: cleanToken,
         activationTokenExpiresAt: { gt: new Date() },
       },

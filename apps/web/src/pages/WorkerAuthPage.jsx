@@ -357,11 +357,17 @@ export const WorkerAuthPage = () => {
                 <p className="text-xs text-slate-400 mt-1">
                   Workers are provisioned by your municipal organization supervisor. Enter your Worker ID, activation token, and create your password.
                 </p>
+                <div className="mt-2.5 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
+                  <span className="font-bold">Testing Invitation Token?</span> Use sample pending worker:
+                  <div className="font-mono mt-1 text-[11px] text-amber-300">
+                    ID: <strong className="text-white">WRK-NSK-103</strong> • Token: <strong className="text-white">ACT-NSK-2026</strong>
+                  </div>
+                </div>
               </div>
 
               <form onSubmit={handleActivate} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Worker ID</label>
+                  <label className="block text-xs font-semibold text-slate-300">Worker ID or Registered Work Email</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                       <UserCheck className="h-4 w-4" />
@@ -370,8 +376,8 @@ export const WorkerAuthPage = () => {
                       type="text"
                       required
                       value={actWorkerId}
-                      onChange={(e) => setActWorkerId(e.target.value.toUpperCase())}
-                      placeholder="e.g. WRK-NSK-101"
+                      onChange={(e) => setActWorkerId(e.target.value)}
+                      placeholder="e.g. WRK-NSK-103 or worker.pending@econexus.gov.in"
                       className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>

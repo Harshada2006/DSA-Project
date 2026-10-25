@@ -52,8 +52,8 @@ router.post('/citizen/login', authRateLimiter, async (req, res) => {
   }
 });
 
-// Backwards compatibility OTP endpoints
-router.post('/citizen/otp', otpRateLimiter, async (req, res) => {
+// Verification & OTP endpoints (with /verify-email alias)
+router.post(['/citizen/otp', '/citizen/resend-code'], otpRateLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const result = await authService.resendCitizenVerification(email);
@@ -63,10 +63,11 @@ router.post('/citizen/otp', otpRateLimiter, async (req, res) => {
   }
 });
 
-router.post('/citizen/verify', authRateLimiter, async (req, res) => {
+router.post(['/citizen/verify', '/citizen/verify-email'], authRateLimiter, async (req, res) => {
   try {
-    const { email, otpCode } = req.body;
-    const result = await authService.verifyCitizenEmail(email, otpCode, req);
+    const { email, otpCode, code } = req.body;
+    const effectiveCode = otpCode || code;
+    const result = await authService.verifyCitizenEmail(email, effectiveCode, req);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

@@ -176,17 +176,17 @@ export const OverviewPage = () => {
         </Link>
 
         <Link
-          to="/organization/issues"
+          to="/organization/prioritized-tasks"
           className="group p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex items-center gap-4"
         >
-          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-colors">
-            <AlertTriangle className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+            <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="font-bold text-sm text-slate-900 group-hover:text-rose-700 transition-colors block">
-              Roadblocks & Issues
+            <span className="font-bold text-sm text-slate-900 group-hover:text-teal-700 transition-colors block">
+              Collection Priority
             </span>
-            <span className="text-xs text-slate-500">Monitor road closures</span>
+            <span className="text-xs text-slate-500">Urgency-ranked bins</span>
           </div>
         </Link>
 

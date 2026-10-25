@@ -25,6 +25,7 @@ import {
   Layers,
   MapPin,
   FileSpreadsheet,
+  Building2,
 } from 'lucide-react';
 
 export const AnalyticsPage = () => {

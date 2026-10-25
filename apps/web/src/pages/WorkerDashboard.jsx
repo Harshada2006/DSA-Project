@@ -22,9 +22,13 @@ import {
   Building2,
   FileCheck2,
 } from 'lucide-react';
+import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
+import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 export const WorkerDashboard = () => {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'route' | 'record' | 'issue' | 'scan' | 'ewaste'
 
   // Data state
@@ -344,14 +348,18 @@ export const WorkerDashboard = () => {
             </div>
           </div>
 
-          <button
-            onClick={logout}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Sign Out</span>
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSelector />
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{t('sign_out', 'Sign Out')}</span>
+            </button>
+          </div>
         </div>
       </header>
 

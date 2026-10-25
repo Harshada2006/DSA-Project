@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { datasetService } from '../services/datasetService.js';
+import xlsx from 'xlsx';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -118,6 +119,33 @@ async function main() {
           assignedWard: 'Nashik West',
           vehicleType: 'tipper_truck',
           isActivated: true,
+          status: 'active',
+        },
+      },
+    },
+    include: { workerProfile: true },
+  });
+
+  const worker3Pending = await prisma.user.create({
+    data: {
+      email: 'worker.pending@econexus.gov.in',
+      name: 'Sachin Kadam (Pending Activation)',
+      password: null,
+      role: 'WORKER',
+      status: 'active',
+      isEmailVerified: true,
+      organizationId: org.id,
+      workerProfile: {
+        create: {
+          organizationId: org.id,
+          workerId: 'WRK-NSK-103',
+          orgCode: org.code,
+          phone: '+91 98221 77331',
+          assignedWard: 'CIDCO',
+          vehicleType: 'compactor_truck',
+          isActivated: false,
+          activationToken: 'ACT-NSK-2026',
+          activationTokenExpiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
           status: 'active',
         },
       },
@@ -443,6 +471,66 @@ async function main() {
       provenance: 'synthetic',
     },
   ];
+
+  // Load full 40-bin dataset from Eco_Collect_Nashik_Datasets.xlsx
+  const excelCandidates = [
+    path.resolve(__dirname, '../../../../data/import/Eco_Collect_Nashik_Datasets.xlsx'),
+    path.resolve(process.cwd(), 'data/import/Eco_Collect_Nashik_Datasets.xlsx'),
+  ];
+  const excelPath = excelCandidates.find((p) => fs.existsSync(p));
+  if (excelPath) {
+    const wb = xlsx.readFile(excelPath);
+    if (wb.Sheets['Bin_Master_40']) {
+      const rows = xlsx.utils.sheet_to_json(wb.Sheets['Bin_Master_40']);
+      const zoneToWard = {
+        Panchavati: 'WARD-01',
+        'Nashik West': 'WARD-02',
+        'Nashik East': 'WARD-03',
+        'CIDCO / New Nashik': 'WARD-04',
+        CIDCO: 'WARD-04',
+        Satpur: 'WARD-05',
+        'Nashik Road': 'WARD-06',
+      };
+      const wardBaseCoords = {
+        'WARD-01': { lat: 20.0080, lng: 73.7950 },
+        'WARD-02': { lat: 19.9980, lng: 73.7740 },
+        'WARD-03': { lat: 19.9920, lng: 73.7920 },
+        'WARD-04': { lat: 19.9650, lng: 73.7550 },
+        'WARD-05': { lat: 19.9820, lng: 73.7300 },
+        'WARD-06': { lat: 19.9520, lng: 73.8320 },
+      };
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const binCode = `BIN-NSK-${String(i + 1).padStart(3, '0')}`;
+        // Skip if already in binsData (first 10)
+        if (binsData.some((b) => b.code === binCode)) continue;
+
+        const wardCode = zoneToWard[row.Zone] || 'WARD-01';
+        const baseCoord = wardBaseCoords[wardCode] || wardBaseCoords['WARD-01'];
+        const latOffset = ((i % 5) - 2) * 0.004 + (i * 0.0001);
+        const lngOffset = (Math.floor(i / 5) - 4) * 0.004;
+
+        binsData.push({
+          code: binCode,
+          name: `${row.Area_Reference || row.Zone} Municipal Bin (${row.Bin_ID})`,
+          wardCode,
+          latitude: Math.round((baseCoord.lat + latOffset) * 10000) / 10000,
+          longitude: Math.round((baseCoord.lng + lngOffset) * 10000) / 10000,
+          capacityLiters: parseFloat(row.Capacity_Litres) || 1000.0,
+          wasteType: row.Area_Type === 'Commercial' ? 'recyclable' : row.Area_Type === 'Industrial' ? 'general' : 'organic',
+          areaCategory: (row.Area_Type || 'residential').toLowerCase(),
+          currentFill: parseFloat(row.Sample_Current_Fill_Percent) || 45.0,
+          urgency: (row.Sample_Priority || '').toLowerCase() === 'high' ? 'critical' : (row.Sample_Priority || '').toLowerCase() === 'medium' ? 'high' : 'normal',
+          priorityScore: Math.round((parseFloat(row.Sample_Current_Fill_Percent) || 45) * 0.9),
+          lastObservedHours: (i % 12) + 1.0,
+          lastCollectedHours: (i % 36) + 12.0,
+          notes: row.Verification_Note || 'Municipal waste collection bin in Nashik',
+          provenance: 'synthetic',
+        });
+      }
+    }
+  }
 
   const createdBins = [];
   for (const b of binsData) {

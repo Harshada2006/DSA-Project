@@ -10,8 +10,12 @@ export class EWasteService {
     const {
       category,
       approximateQuantity,
+      itemCount,
+      weightKg,
       pickupAddress,
+      address,
       preferredPickupDate,
+      preferredDate,
       preferredTimeSlot,
       description,
       itemsDescription,
@@ -22,12 +26,19 @@ export class EWasteService {
     } = data;
 
     const effectiveDesc = description?.trim() || itemsDescription?.trim() || `${category || 'Electronic waste'} pickup`;
-    const effectiveAddress = pickupAddress?.trim();
+    const effectiveAddress = (pickupAddress || address)?.trim();
 
     if (!effectiveAddress) {
       throw new Error('Pickup address is required to arrange doorstep e-waste collection.');
     }
 
+    const effectiveQuantity =
+      approximateQuantity?.trim() ||
+      (itemCount ? `${itemCount} items` : null) ||
+      (weightKg ? `${weightKg} kg` : null) ||
+      'Standard electronics batch';
+
+    const effectiveDate = preferredPickupDate || preferredDate;
     const phone = contactPhone?.trim() || citizenUser?.workerProfile?.phone || citizenUser?.phone || 'Not provided';
 
     const count = await prisma.eWasteRequest.count();
@@ -42,8 +53,8 @@ export class EWasteService {
         contactPhone: phone,
         pickupAddress: effectiveAddress,
         itemsDescription: effectiveDesc,
-        approximateQuantity: approximateQuantity || 'Standard electronics batch',
-        preferredPickupDate: preferredPickupDate ? new Date(preferredPickupDate) : null,
+        approximateQuantity: effectiveQuantity,
+        preferredPickupDate: effectiveDate ? new Date(effectiveDate) : null,
         status: 'submitted',
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
@@ -59,7 +70,11 @@ export class EWasteService {
       req,
     });
 
-    return request;
+    return {
+      ...request,
+      trackingNumber: request.ticketNo,
+      preferredDate: request.preferredPickupDate ? request.preferredPickupDate.toISOString().split('T')[0] : null,
+    };
   }
 
   /**
