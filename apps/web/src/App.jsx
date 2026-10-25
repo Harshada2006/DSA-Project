@@ -21,15 +21,13 @@ import { OverviewPage } from './pages/OverviewPage.jsx';
 import { BinsPage } from './pages/BinsPage.jsx';
 import { LiveMapPage } from './pages/LiveMapPage.jsx';
 import { PrioritizedTasksPage } from './pages/PrioritizedTasksPage.jsx';
-import { RouteOptimizationPage } from './pages/RouteOptimizationPage.jsx';
 import { TasksPage } from './pages/TasksPage.jsx';
 import { WorkersPage } from './pages/WorkersPage.jsx';
 import { ComplaintsPage } from './pages/ComplaintsPage.jsx';
 import { EWastePage } from './pages/EWastePage.jsx';
 import { FacilitiesPage } from './pages/FacilitiesPage.jsx';
-import { SchedulesPage } from './pages/SchedulesPage.jsx';
+import { IssuesPage } from './pages/IssuesPage.jsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.jsx';
-import { DataSourcesPage } from './pages/DataSourcesPage.jsx';
 
 export const App = () => {
   return (
@@ -79,16 +77,18 @@ export const App = () => {
             <Route path="live-map" element={<Navigate to="/organization/map" replace />} />
             <Route path="prioritized-tasks" element={<PrioritizedTasksPage />} />
             <Route path="tasks-priority" element={<Navigate to="/organization/prioritized-tasks" replace />} />
-            <Route path="route-optimization" element={<RouteOptimizationPage />} />
-            <Route path="routes" element={<Navigate to="/organization/route-optimization" replace />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="workers" element={<WorkersPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="ewaste" element={<EWastePage />} />
             <Route path="facilities" element={<FacilitiesPage />} />
-            <Route path="schedules" element={<SchedulesPage />} />
+            <Route path="issues" element={<IssuesPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="data-sources" element={<DataSourcesPage />} />
+            {/* Redirects for removed modules */}
+            <Route path="route-optimization" element={<Navigate to="/organization/tasks" replace />} />
+            <Route path="routes" element={<Navigate to="/organization/tasks" replace />} />
+            <Route path="schedules" element={<Navigate to="/organization/overview" replace />} />
+            <Route path="data-sources" element={<Navigate to="/organization/overview" replace />} />
           </Route>
 
           {/* Fallback */}

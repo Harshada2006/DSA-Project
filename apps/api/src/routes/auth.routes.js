@@ -6,51 +6,67 @@ import { authRateLimiter, otpRateLimiter } from '../middleware/rateLimiter.js';
 const router = Router();
 
 // -------------------------------------------------------------
-// CITIZEN AUTHENTICATION
+// 1. CITIZEN AUTHENTICATION (PASSWORD LOGIN, SIGNUP & VERIFY)
 // -------------------------------------------------------------
 
-// Request email OTP / verification code
-router.post('/citizen/otp', otpRateLimiter, async (req, res) => {
+// Citizen registration with password
+router.post('/citizen/register', authRateLimiter, async (req, res) => {
   try {
-    const { email, name } = req.body;
-    const result = await authService.requestCitizenOtp(email, name);
+    const result = await authService.citizenRegister(req.body, req);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Citizen email verification
+router.post('/citizen/verify-email', authRateLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    const result = await authService.verifyCitizenEmail(email, code, req);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// Verify OTP & sign in / register
-router.post('/citizen/verify', authRateLimiter, async (req, res) => {
+// Resend verification code
+router.post('/citizen/resend-code', otpRateLimiter, async (req, res) => {
   try {
-    const { email, otpCode, name } = req.body;
-    const result = await authService.verifyCitizenOtp(email, otpCode, name, req);
+    const { email } = req.body;
+    const result = await authService.resendCitizenVerification(email);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// -------------------------------------------------------------
-// WORKER AUTHENTICATION & ACTIVATION
-// -------------------------------------------------------------
-
-// Worker login with Worker ID, Org Code, and Password
-router.post('/worker/login', authRateLimiter, async (req, res) => {
+// Citizen password login
+router.post('/citizen/login', authRateLimiter, async (req, res) => {
   try {
-    const { workerId, orgCode, password } = req.body;
-    const result = await authService.workerLogin(workerId, orgCode, password, req);
+    const { email, password } = req.body;
+    const result = await authService.citizenLogin(email, password, req);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(401).json({ success: false, error: err.message });
   }
 });
 
-// Worker account activation (set password)
-router.post('/worker/activate', authRateLimiter, async (req, res) => {
+// Backwards compatibility OTP endpoints
+router.post('/citizen/otp', otpRateLimiter, async (req, res) => {
   try {
-    const { workerId, activationToken, newPassword } = req.body;
-    const result = await authService.activateWorkerAccount(workerId, activationToken, newPassword, req);
+    const { email } = req.body;
+    const result = await authService.resendCitizenVerification(email);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/citizen/verify', authRateLimiter, async (req, res) => {
+  try {
+    const { email, otpCode } = req.body;
+    const result = await authService.verifyCitizenEmail(email, otpCode, req);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -58,10 +74,59 @@ router.post('/worker/activate', authRateLimiter, async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// ORGANIZATION ADMIN AUTHENTICATION
+// 2. PASSWORD RESET (Citizen & Worker)
 // -------------------------------------------------------------
 
-// Request organization registration (pending approval)
+router.post('/password/reset-request', otpRateLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.requestPasswordReset(email, req);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/password/reset-confirm', authRateLimiter, async (req, res) => {
+  try {
+    const result = await authService.resetPassword(req.body, req);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 3. WORKER AUTHENTICATION & ACTIVATION
+// -------------------------------------------------------------
+
+// Worker login with Worker ID or work email + Password
+router.post('/worker/login', authRateLimiter, async (req, res) => {
+  try {
+    const { workerId, email, password } = req.body;
+    const identifier = workerId || email;
+    const result = await authService.workerLogin(identifier, password, req);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(401).json({ success: false, error: err.message });
+  }
+});
+
+// Worker account activation (sets password via admin-issued token)
+router.post('/worker/activate', authRateLimiter, async (req, res) => {
+  try {
+    const result = await authService.activateWorkerAccount(req.body, req);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 4. ORGANIZATION ADMIN AUTHENTICATION
+// -------------------------------------------------------------
+
+// Request organization access (pending administrative review)
 router.post('/organization/register', authRateLimiter, async (req, res) => {
   try {
     const result = await authService.requestOrganizationRegistration(req.body, req);
@@ -83,7 +148,7 @@ router.post('/organization/login', authRateLimiter, async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// SESSION / CURRENT USER
+// 5. SESSION / CURRENT USER
 // -------------------------------------------------------------
 
 router.get('/me', authenticate, async (req, res) => {

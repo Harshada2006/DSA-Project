@@ -3,20 +3,16 @@ import { api } from '../api/client.js';
 import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
-import { Modal } from '../components/common/Modal.jsx';
-import { ProvenanceBadge } from '../components/common/ProvenanceBadge.jsx';
+import { SearchInput } from '../components/common/SearchInput.jsx';
 import {
   Plus,
-  Search,
   RefreshCw,
-  Eye,
   Trash2,
-  Edit2,
-  Clock,
   AlertCircle,
   CheckCircle2,
   MapPin,
   Sparkles,
+  Info,
 } from 'lucide-react';
 
 export const BinsPage = () => {
@@ -43,14 +39,11 @@ export const BinsPage = () => {
     capacityLiters: 1100,
     latitude: 20.005,
     longitude: 73.785,
-    provenance: 'NMC_FIELD_INSPECTION',
     notes: '',
   });
 
-  const [observationBin, setObservationBin] = useState(null);
-  const [obsFill, setObsFill] = useState(75);
-  const [obsNotes, setObsNotes] = useState('');
-  const [obsLoading, setObsLoading] = useState(false);
+  // Selected bin detail modal
+  const [detailBin, setDetailBin] = useState(null);
 
   const showToast = (type, message) => {
     setFeedback({ type, message });
@@ -62,7 +55,6 @@ export const BinsPage = () => {
     try {
       const [binsRes, wardsRes] = await Promise.all([
         api.getBins({
-          search: search || undefined,
           wardId: selectedWard || undefined,
           urgency: selectedUrgency || undefined,
           wasteType: selectedWasteType || undefined,
@@ -85,11 +77,6 @@ export const BinsPage = () => {
     loadData();
   }, [selectedWard, selectedUrgency, selectedWasteType]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    loadData();
-  };
-
   const handleCreateBin = async (e) => {
     e.preventDefault();
     setAddLoading(true);
@@ -106,7 +93,6 @@ export const BinsPage = () => {
         capacityLiters: 1100,
         latitude: 20.005,
         longitude: 73.785,
-        provenance: 'NMC_FIELD_INSPECTION',
         notes: '',
       });
       loadData();
@@ -117,27 +103,16 @@ export const BinsPage = () => {
     }
   };
 
-  const handleRecordObservation = async (e) => {
-    e.preventDefault();
-    if (!observationBin) return;
-
-    setObsLoading(true);
-    try {
-      await api.recordObservation(observationBin.id, {
-        fillPercentage: obsFill,
-        source: 'MANUAL_INSPECTION',
-        provenance: 'VERIFIED_FIELD_OBSERVATION',
-        notes: obsNotes || 'Manual inspection logged via admin panel',
-      });
-      showToast('success', `Observation for ${observationBin.code} logged! C++ priority recalibrated.`);
-      setObservationBin(null);
-      loadData();
-    } catch (err) {
-      showToast('error', `Failed to log observation: ${err.message}`);
-    } finally {
-      setObsLoading(false);
-    }
-  };
+  const filteredBins = bins.filter((b) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (b.code || '').toLowerCase().includes(q) ||
+      (b.name || '').toLowerCase().includes(q) ||
+      (b.ward?.name || '').toLowerCase().includes(q) ||
+      (b.areaCategory || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -179,25 +154,23 @@ export const BinsPage = () => {
         </Button>
       </div>
 
-      {/* Filters Bar */}
+      {/* Filters Bar with SearchInput */}
       <Card className="p-4">
-        <form onSubmit={handleSearch} className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="relative min-w-[220px] flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by code, landmark, or name..."
-                className="w-full pl-10 pr-3.5 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onClear={() => setSearch('')}
+              placeholder="Search by code, landmark, or name..."
+            />
+          </div>
 
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={selectedWard}
               onChange={(e) => setSelectedWard(e.target.value)}
-              className="px-3.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500"
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">All Wards</option>
               {wards.map((w) => (
@@ -210,7 +183,7 @@ export const BinsPage = () => {
             <select
               value={selectedUrgency}
               onChange={(e) => setSelectedUrgency(e.target.value)}
-              className="px-3.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500"
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">All Urgencies</option>
               <option value="critical">Critical Only</option>
@@ -218,12 +191,20 @@ export const BinsPage = () => {
               <option value="medium">Medium Only</option>
               <option value="low">Low Only</option>
             </select>
-          </div>
 
-          <Button type="submit" variant="outline" size="md" icon={<RefreshCw className="w-4 h-4" />}>
-            Filter
-          </Button>
-        </form>
+            <select
+              value={selectedWasteType}
+              onChange={(e) => setSelectedWasteType(e.target.value)}
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="">All Waste Streams</option>
+              <option value="SOLID">Solid / Mixed</option>
+              <option value="ORGANIC">Organic / Wet</option>
+              <option value="RECYCLABLE">Recyclable / Dry</option>
+              <option value="HAZARDOUS">Hazardous</option>
+            </select>
+          </div>
+        </div>
       </Card>
 
       {/* Bins Table */}
@@ -235,28 +216,27 @@ export const BinsPage = () => {
                 <th className="p-3.5">Asset Code & Name</th>
                 <th className="p-3.5">Nashik Ward</th>
                 <th className="p-3.5">Type & Capacity</th>
-                <th className="p-3.5">Fill Level</th>
-                <th className="p-3.5">C++ Score</th>
-                <th className="p-3.5">Data Provenance</th>
-                <th className="p-3.5 text-right">Actions</th>
+                <th className="p-3.5">Predicted Fill Level (Est.)</th>
+                <th className="p-3.5">Priority Score</th>
+                <th className="p-3.5 text-right">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center p-8 text-slate-400">
+                  <td colSpan={6} className="text-center p-8 text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
-                    Loading bins from SQLite database...
+                    Loading bins from database...
                   </td>
                 </tr>
-              ) : bins.length === 0 ? (
+              ) : filteredBins.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center p-8 text-slate-500">
+                  <td colSpan={6} className="text-center p-8 text-slate-500">
                     No bins match your current filters.
                   </td>
                 </tr>
               ) : (
-                bins.map((bin) => {
+                filteredBins.map((bin) => {
                   const fill = bin.currentFillPercentage || 0;
                   let fillBarColor = 'bg-emerald-500';
                   if (fill >= 80) fillBarColor = 'bg-rose-500';
@@ -269,19 +249,20 @@ export const BinsPage = () => {
                         <div className="text-slate-600 text-xs font-medium">{bin.name}</div>
                       </td>
                       <td className="p-3.5">
-                        <div className="text-slate-800 font-semibold">{bin.ward?.name || 'Nashik Ward'}</div>
-                        <div className="text-slate-500 text-xs uppercase">{bin.areaCategory}</div>
+                        <div className="text-slate-800 font-semibold text-xs">{bin.ward?.name || 'Nashik Ward'}</div>
+                        <div className="text-slate-500 text-[11px] uppercase">{bin.areaCategory}</div>
                       </td>
                       <td className="p-3.5">
-                        <div className="text-slate-800 capitalize font-medium">{bin.wasteType}</div>
-                        <div className="text-slate-500 text-xs">{bin.capacityLiters} Liters</div>
+                        <div className="text-slate-800 capitalize font-medium text-xs">{bin.wasteType}</div>
+                        <div className="text-slate-500 text-[11px]">{bin.capacityLiters} Liters</div>
                       </td>
                       <td className="p-3.5">
                         <div className="flex items-center gap-2">
                           <div className="w-16 bg-slate-200 h-2.5 rounded-full overflow-hidden">
                             <div className={`h-full ${fillBarColor}`} style={{ width: `${Math.min(100, fill)}%` }} />
                           </div>
-                          <span className="font-mono font-bold text-slate-800 text-sm">{fill}%</span>
+                          <span className="font-mono font-bold text-slate-800 text-sm">{Math.round(fill)}%</span>
+                          <span className="text-[10px] text-slate-400">est.</span>
                         </div>
                       </td>
                       <td className="p-3.5">
@@ -289,19 +270,14 @@ export const BinsPage = () => {
                           {Math.round(bin.priorityScore || 0)}
                         </span>
                       </td>
-                      <td className="p-3.5">
-                        <ProvenanceBadge provenance={bin.provenance} />
-                      </td>
                       <td className="p-3.5 text-right">
                         <Button
                           variant="outline"
                           size="xs"
-                          onClick={() => {
-                            setObservationBin(bin);
-                            setObsFill(bin.currentFillPercentage || 50);
-                          }}
+                          onClick={() => setDetailBin(bin)}
+                          icon={<Info className="w-3 h-3" />}
                         >
-                          Record Fill
+                          View Info
                         </Button>
                       </td>
                     </tr>
@@ -313,179 +289,170 @@ export const BinsPage = () => {
         </div>
       </Card>
 
-      {/* Add Bin Modal */}
-      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Register Municipal Waste Bin Asset">
-        <form onSubmit={handleCreateBin} className="space-y-3 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Asset Code *</label>
-              <input
-                type="text"
-                required
-                value={addForm.code}
-                onChange={(e) => setAddForm({ ...addForm, code: e.target.value })}
-                placeholder="BIN-NSK-PAN-010"
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Asset Name *</label>
-              <input
-                type="text"
-                required
-                value={addForm.name}
-                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                placeholder="Ramkund North Ghat Bin"
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Ward *</label>
-              <select
-                required
-                value={addForm.wardId}
-                onChange={(e) => setAddForm({ ...addForm, wardId: e.target.value })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500"
+      {/* Asset Info Modal (Section 24: No raw coordinates in address text) */}
+      {detailBin && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div>
+                <span className="font-mono font-bold text-amber-700 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  {detailBin.code}
+                </span>
+                <h3 className="text-base font-bold text-slate-900 mt-1">{detailBin.name}</h3>
+              </div>
+              <button
+                onClick={() => setDetailBin(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
               >
-                {wards.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    Ward {w.number}: {w.name}
-                  </option>
-                ))}
-              </select>
+                ✕
+              </button>
             </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Area Category</label>
-              <select
-                value={addForm.areaCategory}
-                onChange={(e) => setAddForm({ ...addForm, areaCategory: e.target.value })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="pilgrimage">Pilgrimage / Religious Site</option>
-                <option value="market">Market / Vegetable Mandi</option>
-                <option value="commercial">Commercial / High Footfall</option>
-                <option value="residential">Residential Colony</option>
-                <option value="industrial">Industrial / MIDC</option>
-              </select>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Waste Type</label>
-              <select
-                value={addForm.wasteType}
-                onChange={(e) => setAddForm({ ...addForm, wasteType: e.target.value })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="SOLID">Solid / Mixed</option>
-                <option value="ORGANIC">Organic / Wet</option>
-                <option value="RECYCLABLE">Recyclable / Dry</option>
-                <option value="HAZARDOUS">Hazardous</option>
-              </select>
+            <div className="space-y-2.5 text-xs text-slate-700">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Administrative Ward:</span>
+                <strong className="text-slate-900">{detailBin.ward?.name || 'Nashik'} ({detailBin.ward?.zone || 'Zone'})</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Area Category:</span>
+                <strong className="text-slate-900 capitalize">{detailBin.areaCategory}</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Container Capacity:</span>
+                <strong className="text-slate-900">{detailBin.capacityLiters} Liters</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Waste Classification:</span>
+                <strong className="text-slate-900 capitalize">{detailBin.wasteType}</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Estimated Next-Day Fill:</span>
+                <strong className="text-slate-900 font-mono text-sm">~{Math.round(detailBin.currentFillPercentage || 0)}%</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Collection Priority Score:</span>
+                <strong className="text-emerald-700 font-mono text-sm">{Math.round(detailBin.priorityScore || 0)} / 100</strong>
+              </div>
             </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Capacity (Liters)</label>
-              <input
-                type="number"
-                value={addForm.capacityLiters}
-                onChange={(e) => setAddForm({ ...addForm, capacityLiters: parseInt(e.target.value, 10) || 1100 })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
+
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500">
+              <strong>Prediction Horizon:</strong> Expected fill level tomorrow (24h horizon). Fill level is statistical estimation, not a physical sensor measurement.
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <Button variant="primary" size="sm" onClick={() => setDetailBin(null)}>
+                Close
+              </Button>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                value={addForm.latitude}
-                onChange={(e) => setAddForm({ ...addForm, latitude: parseFloat(e.target.value) || 20.0 })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                value={addForm.longitude}
-                onChange={(e) => setAddForm({ ...addForm, longitude: parseFloat(e.target.value) || 73.78 })}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
+      {/* Add Asset Modal */}
+      {isAddOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Register Municipal Bin Asset</h3>
+            <p className="text-xs text-slate-500 mb-5">
+              Add a new waste receptacle mapped to Nashik administrative wards.
+            </p>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Data Provenance Attribution *</label>
-            <select
-              value={addForm.provenance}
-              onChange={(e) => setAddForm({ ...addForm, provenance: e.target.value })}
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="NMC_FIELD_INSPECTION">NMC Verified Field Survey</option>
-              <option value="SYNTHETIC_DEMO">Synthetic Demo Record</option>
-            </select>
-          </div>
+            <form onSubmit={handleCreateBin} className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Asset Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.code}
+                    onChange={(e) => setAddForm({ ...addForm, code: e.target.value.toUpperCase() })}
+                    placeholder="e.g. BIN-NSK-PAN-015"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Asset Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.name}
+                    onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                    placeholder="e.g. Ramkund Main Steps Bin"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
 
-          <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsAddOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={addLoading}>
-              Save Asset
-            </Button>
-          </div>
-        </form>
-      </Modal>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Nashik Ward *</label>
+                  <select
+                    required
+                    value={addForm.wardId}
+                    onChange={(e) => setAddForm({ ...addForm, wardId: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                  >
+                    {wards.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        Ward {w.number}: {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Area Category *</label>
+                  <select
+                    value={addForm.areaCategory}
+                    onChange={(e) => setAddForm({ ...addForm, areaCategory: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                  >
+                    <option value="commercial">Commercial Market</option>
+                    <option value="residential">Residential Colony</option>
+                    <option value="pilgrimage">Pilgrimage / River Ghat</option>
+                    <option value="industrial">Industrial MIDC</option>
+                  </select>
+                </div>
+              </div>
 
-      {/* Record Observation Modal */}
-      <Modal
-        isOpen={!!observationBin}
-        onClose={() => setObservationBin(null)}
-        title={`Record Fill Level: ${observationBin?.code || ''}`}
-      >
-        <form onSubmit={handleRecordObservation} className="space-y-4 text-xs">
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Observed Fullness Percentage: <strong className="text-emerald-700 text-sm">{obsFill}%</strong>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={obsFill}
-              onChange={(e) => setObsFill(parseInt(e.target.value, 10))}
-              className="w-full accent-emerald-600"
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Capacity (Liters) *</label>
+                  <input
+                    type="number"
+                    min="100"
+                    required
+                    value={addForm.capacityLiters}
+                    onChange={(e) => setAddForm({ ...addForm, capacityLiters: parseInt(e.target.value, 10) || 1100 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Waste Stream *</label>
+                  <select
+                    value={addForm.wasteType}
+                    onChange={(e) => setAddForm({ ...addForm, wasteType: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                  >
+                    <option value="SOLID">Solid / Mixed</option>
+                    <option value="ORGANIC">Organic / Wet</option>
+                    <option value="RECYCLABLE">Recyclable / Dry</option>
+                    <option value="HAZARDOUS">Hazardous</option>
+                  </select>
+                </div>
+              </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Sanitary Inspector Notes</label>
-            <input
-              type="text"
-              value={obsNotes}
-              onChange={(e) => setObsNotes(e.target.value)}
-              placeholder="e.g. Visual verification by Ward Sanitary Sub-Inspector"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-            />
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <Button variant="outline" size="sm" onClick={() => setIsAddOpen(false)} type="button">
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" isLoading={addLoading}>
+                  Create Asset
+                </Button>
+              </div>
+            </form>
           </div>
-
-          <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setObservationBin(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={obsLoading}>
-              Update & Recalibrate Heap
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 };

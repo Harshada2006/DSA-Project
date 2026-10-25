@@ -6,7 +6,6 @@ import {
   FileText, 
   MapPin, 
   Tv, 
-  Calendar, 
   BookOpen, 
   AlertCircle, 
   PlusCircle, 
@@ -14,24 +13,23 @@ import {
   CheckCircle2, 
   LogOut, 
   ShieldCheck, 
-  Sparkles,
-  Search,
-  Filter,
-  Camera,
   Layers,
+  Phone,
+  Calendar,
+  Building2,
+  ExternalLink,
 } from 'lucide-react';
 
 export const CitizenDashboard = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('report'); // 'report' | 'my-complaints' | 'map' | 'ewaste' | 'schedules' | 'guide'
+  const [activeTab, setActiveTab] = useState('report'); // 'report' | 'my-complaints' | 'map' | 'ewaste' | 'my-ewaste' | 'guide'
 
   // Data state
   const [wards, setWards] = useState([]);
   const [bins, setBins] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [myComplaints, setMyComplaints] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [myEWasteRequests, setMyEWasteRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -40,9 +38,7 @@ export const CitizenDashboard = () => {
     title: '',
     description: '',
     category: 'OVERFLOW',
-    severity: 'MEDIUM',
     wardId: '',
-    binId: '',
     landmark: '',
     photoUrl: '',
   });
@@ -50,10 +46,11 @@ export const CitizenDashboard = () => {
   const [ewasteForm, setEWasteForm] = useState({
     category: 'CONSUMER_ELECTRONICS',
     itemCount: 1,
-    weightKg: 2.5,
+    weightKg: '',
     description: '',
-    address: 'Flat 402, Anand Residency, Gangapur Road, Nashik',
-    landmark: 'Near KTHM College',
+    address: '',
+    landmark: '',
+    contactPhone: '',
     preferredDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     preferredTimeSlot: 'MORNING',
   });
@@ -65,20 +62,18 @@ export const CitizenDashboard = () => {
 
   const loadInitialData = async () => {
     try {
-      const [wardsData, binsData, facData, myComplaintsData, schedData, eventsData] = await Promise.all([
+      const [wardsData, binsData, facData, myComplaintsData, ewasteData] = await Promise.all([
         api.getWards().catch(() => []),
         api.getBins().catch(() => []),
         api.getFacilities().catch(() => []),
         api.getComplaints().catch(() => []),
-        api.getSchedules().catch(() => []),
-        api.getEvents().catch(() => []),
+        api.getEWasteRequests().catch(() => []),
       ]);
       setWards(wardsData || []);
       setBins(binsData || []);
       setFacilities(facData || []);
       setMyComplaints(myComplaintsData || []);
-      setSchedules(schedData || []);
-      setEvents(eventsData || []);
+      setMyEWasteRequests(ewasteData || []);
       if (wardsData && wardsData.length > 0 && !complaintForm.wardId) {
         setComplaintForm((prev) => ({ ...prev, wardId: wardsData[0].id }));
       }
@@ -89,23 +84,40 @@ export const CitizenDashboard = () => {
 
   const handleComplaintSubmit = async (e) => {
     e.preventDefault();
+    if (!complaintForm.title.trim()) {
+      setNotice({ type: 'error', text: 'Please provide a short summary of the issue.' });
+      return;
+    }
+    if (!complaintForm.wardId) {
+      setNotice({ type: 'error', text: 'Please select an administrative ward in Nashik.' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await api.submitComplaint(complaintForm);
+      const res = await api.submitComplaint({
+        title: complaintForm.title.trim(),
+        description: complaintForm.description.trim() || undefined,
+        category: complaintForm.category,
+        wardId: complaintForm.wardId,
+        landmark: complaintForm.landmark.trim() || undefined,
+        photoUrl: complaintForm.photoUrl.trim() || undefined,
+      });
+
       setNotice({
         type: 'success',
         text: `Complaint ticket #${res.ticketNumber || res.id} registered! NMC Waste Control Room will inspect within 24 hours.`,
       });
+
       setComplaintForm({
         title: '',
         description: '',
         category: 'OVERFLOW',
-        severity: 'MEDIUM',
         wardId: wards[0]?.id || '',
-        binId: '',
         landmark: '',
         photoUrl: '',
       });
+
       const updated = await api.getComplaints();
       setMyComplaints(updated || []);
       setActiveTab('my-complaints');
@@ -118,23 +130,45 @@ export const CitizenDashboard = () => {
 
   const handleEWasteSubmit = async (e) => {
     e.preventDefault();
+    if (!ewasteForm.address.trim()) {
+      setNotice({ type: 'error', text: 'Please provide a doorstep pickup address.' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await api.submitEWasteRequest(ewasteForm);
+      const res = await api.submitEWasteRequest({
+        category: ewasteForm.category,
+        itemCount: parseInt(ewasteForm.itemCount, 10) || 1,
+        weightKg: ewasteForm.weightKg ? parseFloat(ewasteForm.weightKg) : undefined,
+        description: ewasteForm.description.trim() || undefined,
+        address: ewasteForm.address.trim(),
+        landmark: ewasteForm.landmark.trim() || undefined,
+        contactPhone: ewasteForm.contactPhone.trim() || undefined,
+        preferredDate: ewasteForm.preferredDate || undefined,
+        preferredTimeSlot: ewasteForm.preferredTimeSlot || undefined,
+      });
+
       setNotice({
         type: 'success',
         text: `E-Waste pickup request #${res.trackingNumber || res.id} scheduled for ${res.preferredDate || 'tomorrow'}! Municipal collection crew will contact you.`,
       });
+
       setEWasteForm({
         category: 'CONSUMER_ELECTRONICS',
         itemCount: 1,
-        weightKg: 2.5,
+        weightKg: '',
         description: '',
-        address: 'Flat 402, Anand Residency, Gangapur Road, Nashik',
+        address: '',
         landmark: '',
+        contactPhone: '',
         preferredDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         preferredTimeSlot: 'MORNING',
       });
+
+      const updated = await api.getEWasteRequests();
+      setMyEWasteRequests(updated || []);
+      setActiveTab('my-ewaste');
     } catch (err) {
       setNotice({ type: 'error', text: err.message || 'Failed to submit e-waste request.' });
     } finally {
@@ -149,12 +183,14 @@ export const CitizenDashboard = () => {
       UNDER_REVIEW: 'bg-amber-50 text-amber-800 border-amber-200',
       ASSIGNED: 'bg-purple-50 text-purple-800 border-purple-200',
       IN_PROGRESS: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+      COLLECTED: 'bg-teal-50 text-teal-800 border-teal-200',
+      DELIVERED_TO_RECYCLER: 'bg-emerald-50 text-emerald-800 border-emerald-200',
       RESOLVED: 'bg-emerald-50 text-emerald-800 border-emerald-200',
       REJECTED: 'bg-rose-50 text-rose-800 border-rose-200',
     };
     return (
       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${map[s] || 'bg-slate-100 text-slate-700'}`}>
-        {s}
+        {s.replace(/_/g, ' ')}
       </span>
     );
   };
@@ -195,11 +231,8 @@ export const CitizenDashboard = () => {
         </div>
       </header>
 
-      {/* Visual Welcome Banner with Picture */}
+      {/* Visual Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white relative overflow-hidden border-b border-emerald-800/40">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-20 pointer-events-none overflow-hidden">
-          <img src="/assets/nashik_hero.jpg" alt="Nashik Cleanliness" className="w-full h-full object-cover" />
-        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 mb-2">
@@ -245,7 +278,7 @@ export const CitizenDashboard = () => {
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col">
-        {/* Navigation Tabs - Larger, Readable, User-Friendly */}
+        {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2.5 border-b border-slate-200 pb-4 mb-6">
           <button
             onClick={() => setActiveTab('report')}
@@ -296,15 +329,15 @@ export const CitizenDashboard = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('schedules')}
+            onClick={() => setActiveTab('my-ewaste')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
-              activeTab === 'schedules'
+              activeTab === 'my-ewaste'
                 ? 'bg-emerald-700 text-white shadow-md'
                 : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
             }`}
           >
-            <Calendar className="w-4 h-4" />
-            Ward Timetables
+            <Clock className="w-4 h-4" />
+            My E-Waste Requests ({myEWasteRequests.length})
           </button>
 
           <button
@@ -326,7 +359,7 @@ export const CitizenDashboard = () => {
             <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-1">Report Waste or Overflow Grievance</h2>
               <p className="text-sm text-slate-500 mb-6">
-                Directly alerts NMC Ward Sanitary Inspectors and feeds into our C++ Prioritization Heap.
+                Directly alerts NMC Ward Sanitary Inspectors for rapid field inspection and resolution.
               </p>
 
               <form onSubmit={handleComplaintSubmit} className="space-y-4 text-sm">
@@ -360,23 +393,7 @@ export const CitizenDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Urgency Level *</label>
-                    <select
-                      value={complaintForm.severity}
-                      onChange={(e) => setComplaintForm({ ...complaintForm, severity: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
-                    >
-                      <option value="LOW">Low (Routine)</option>
-                      <option value="MEDIUM">Medium (Moderate accumulation)</option>
-                      <option value="HIGH">High (Spilling onto sidewalk)</option>
-                      <option value="CRITICAL">Critical (Health hazard / Waterway risk)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nashik Ward *</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nashik Ward / Area *</label>
                     <select
                       required
                       value={complaintForm.wardId}
@@ -385,33 +402,17 @@ export const CitizenDashboard = () => {
                     >
                       {wards.map((w) => (
                         <option key={w.id} value={w.id}>
-                          Ward {w.number}: {w.name}
+                          Ward {w.number}: {w.name} ({w.zone})
                         </option>
                       ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Specific Bin (Optional)</label>
-                    <select
-                      value={complaintForm.binId}
-                      onChange={(e) => setComplaintForm({ ...complaintForm, binId: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
-                    >
-                      <option value="">General Area / Not Sure</option>
-                      {bins
-                        .filter((b) => !complaintForm.wardId || b.wardId === complaintForm.wardId)
-                        .map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.code} - {b.name}
-                          </option>
-                        ))}
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Landmark / Exact Address</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Landmark / Location Details <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
                   <input
                     type="text"
                     value={complaintForm.landmark}
@@ -422,7 +423,9 @@ export const CitizenDashboard = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description & Details</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Description & Observations <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
                   <textarea
                     rows={3}
                     value={complaintForm.description}
@@ -452,8 +455,8 @@ export const CitizenDashboard = () => {
                   NMC Citizen Guarantee
                 </div>
                 <p className="text-sm text-slate-700 leading-relaxed">
-                  Every grievance registered on EcoNexus automatically feeds into the NMC Priority Dispatch Heap. 
-                  High-priority overflows near schools, hospitals, and Godavari river banks trigger immediate priority recalibration in our C++ solver.
+                  Every grievance registered on EcoNexus automatically feeds into the NMC municipal priority collection schedule. 
+                  High-priority overflows near schools, hospitals, and Godavari river banks trigger immediate priority handling.
                 </p>
               </div>
 
@@ -486,12 +489,12 @@ export const CitizenDashboard = () => {
               <div>
                 <h2 className="text-lg font-bold text-slate-900">My Registered Grievances & Status</h2>
                 <p className="text-sm text-slate-500">
-                  Track the real-time resolution timeline of your reports handled by Nashik Municipal Corporation.
+                  Track the resolution timeline of your reports handled by Nashik Municipal Corporation.
                 </p>
               </div>
               <button
                 onClick={() => setActiveTab('report')}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 + New Report
               </button>
@@ -547,7 +550,7 @@ export const CitizenDashboard = () => {
             <div className="mb-4">
               <h2 className="text-lg font-bold text-slate-900">Nashik Civic Cleanliness & Bin Map</h2>
               <p className="text-sm text-slate-500">
-                Inspect public bins, waste transfer stations, and authorized MPCB e-waste recyclers across Nashik.
+                Inspect public bins, waste transfer stations, and e-waste collection points across Nashik.
               </p>
             </div>
             <div className="flex-1 rounded-2xl overflow-hidden border border-slate-300 min-h-[500px]">
@@ -565,10 +568,10 @@ export const CitizenDashboard = () => {
         {activeTab === 'ewaste' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Book Safe Doorstep E-Waste Collection</h2>
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Book Free Doorstep E-Waste Collection</h2>
               <p className="text-sm text-slate-500 mb-6">
                 Prevent toxic heavy metals from contaminating the Godavari riverbed. 
-                Our municipal crew directly routes collected electronics to verified MPCB recycling centers.
+                Our municipal crew routes collected electronics to verified downstream recycling destinations.
               </p>
 
               <form onSubmit={handleEWasteSubmit} className="space-y-4 text-sm">
@@ -580,7 +583,7 @@ export const CitizenDashboard = () => {
                       onChange={(e) => setEWasteForm({ ...ewasteForm, category: e.target.value })}
                       className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
                     >
-                      <option value="CONSUMER_ELECTRONICS">Consumer Electronics (TVs, Radios, Audio)</option>
+                      <option value="CONSUMER_ELECTRONICS">Consumer Electronics (TVs, Audio, Home Devices)</option>
                       <option value="COMPUTERS_IT">Computers, Laptops & IT Hardware</option>
                       <option value="HOME_APPLIANCES">Home Appliances (Refrigerators, Microwaves, ACs)</option>
                       <option value="BATTERIES_CABLES">Batteries, Chargers, Power Banks & Cables</option>
@@ -589,36 +592,39 @@ export const CitizenDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Approximate Weight (kg)</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Approximate Item Count <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
                     <input
                       type="number"
-                      step="0.5"
-                      min="0.5"
-                      value={ewasteForm.weightKg}
-                      onChange={(e) => setEWasteForm({ ...ewasteForm, weightKg: parseFloat(e.target.value) || 1 })}
+                      min="1"
+                      value={ewasteForm.itemCount}
+                      onChange={(e) => setEWasteForm({ ...ewasteForm, itemCount: parseInt(e.target.value, 10) || 1 })}
                       className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Device Description</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Device Description <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
                   <input
                     type="text"
-                    required
                     value={ewasteForm.description}
                     onChange={(e) => setEWasteForm({ ...ewasteForm, description: e.target.value })}
-                    placeholder="e.g. 2 CRT monitors, 1 damaged desktop tower, assorted adapter cords"
+                    placeholder="e.g. 2 CRT monitors, 1 desktop tower, assorted adapter cords"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Pickup Date</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Preferred Pickup Date <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
                     <input
                       type="date"
-                      required
                       value={ewasteForm.preferredDate}
                       onChange={(e) => setEWasteForm({ ...ewasteForm, preferredDate: e.target.value })}
                       className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
@@ -626,7 +632,9 @@ export const CitizenDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Time Slot</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Preferred Time Slot <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
                     <select
                       value={ewasteForm.preferredTimeSlot}
                       onChange={(e) => setEWasteForm({ ...ewasteForm, preferredTimeSlot: e.target.value })}
@@ -638,6 +646,34 @@ export const CitizenDashboard = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Contact Phone <span className="text-slate-400 font-normal">(For pickup coordination)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={ewasteForm.contactPhone}
+                      onChange={(e) => setEWasteForm({ ...ewasteForm, contactPhone: e.target.value })}
+                      placeholder="+91 98XXX XXXXX"
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                      Landmark <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={ewasteForm.landmark}
+                      onChange={(e) => setEWasteForm({ ...ewasteForm, landmark: e.target.value })}
+                      placeholder="e.g. Near KTHM College arch"
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Doorstep Address in Nashik *</label>
                   <textarea
@@ -645,7 +681,7 @@ export const CitizenDashboard = () => {
                     required
                     value={ewasteForm.address}
                     onChange={(e) => setEWasteForm({ ...ewasteForm, address: e.target.value })}
-                    placeholder="Enter building, flat number, street, and pin code"
+                    placeholder="Enter building name, flat number, street/colony in Nashik"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none"
                   />
                 </div>
@@ -662,73 +698,97 @@ export const CitizenDashboard = () => {
               </form>
             </div>
 
+            {/* Side Card: Section 18 Nashik E-Waste Facilities */}
             <div className="space-y-4">
               <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-3">
                 <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  Verified MPCB Destination
+                  <Building2 className="w-5 h-5 text-emerald-600" />
+                  Nashik E-Waste Reference Facilities
                 </h4>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Your e-waste is not brokered or dumped. It is documented via our Handover Ledger and delivered directly to MPCB-authorized recyclers:
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Collected electronics are routed to documented facilities in Nashik (Satpur & Ambad MIDC).
                 </p>
-                <div className="space-y-2 pt-2">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                    <span className="font-bold text-slate-900 block text-sm">Trimbak E-Waste Processors</span>
-                    <span className="text-slate-500 font-mono">MPCB/RO-NSK/E-WASTE/2021-04 • MIDC Ambad</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                    <span className="font-bold text-slate-900 block text-sm">Ambad Green Recyclers Ltd.</span>
-                    <span className="text-slate-500 font-mono">MPCB/RO-NSK/E-WASTE/2022-19 • Satpur MIDC</span>
-                  </div>
+                <div className="space-y-2.5 pt-2">
+                  {facilities
+                    .filter((f) => f.facilityType === 'RECYCLER' || f.wasteType === 'ELECTRONIC')
+                    .slice(0, 4)
+                    .map((fac) => (
+                      <div key={fac.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                        <div className="flex justify-between items-start gap-1">
+                          <span className="font-bold text-slate-900 text-xs">{fac.name}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            fac.verificationStatus === 'verified' ? 'bg-emerald-100 text-emerald-800' :
+                            fac.verificationStatus === 'pending_confirmation' ? 'bg-amber-100 text-amber-800' :
+                            'bg-slate-200 text-slate-700'
+                          }`}>
+                            {fac.verificationStatus.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-slate-500 mt-1">{fac.facilityAddress || fac.address}</p>
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab 5: Schedules & Events */}
-        {activeTab === 'schedules' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Ward Door-to-Door Timetables</h2>
-              <p className="text-sm text-slate-500 mb-4">Daily regular collection rounds organized by Nashik Municipal Corporation.</p>
-              
-              <div className="space-y-3">
-                {schedules.map((s) => (
-                  <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-sm text-slate-900 block">{s.ward?.name || 'Nashik Ward'}</span>
-                      <span className="text-xs text-slate-500">Time Window: {s.timeWindow} • Shift: {s.shift}</span>
+        {/* Tab 5: My E-Waste Requests History */}
+        {activeTab === 'my-ewaste' && (
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">My E-Waste Collection Requests</h2>
+                <p className="text-sm text-slate-500">
+                  Track pickup assignment, collection status, and facility handover progress.
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('ewaste')}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+              >
+                + New Pickup Request
+              </button>
+            </div>
+
+            {myEWasteRequests.length === 0 ? (
+              <div className="text-center py-16 text-slate-500">
+                <Tv className="w-14 h-14 text-slate-300 mx-auto mb-3" />
+                <p className="text-base font-semibold">No e-waste pickup requests registered yet</p>
+                <p className="text-sm text-slate-400 mt-1">Book a free doorstep pickup to dispose of electronics responsibly.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myEWasteRequests.map((r) => (
+                  <div key={r.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-colors">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-bold text-purple-800 bg-purple-100 px-2.5 py-1 rounded-lg">
+                          {r.trackingNumber || `EW-${r.id.slice(0, 8)}`}
+                        </span>
+                        <span className="text-sm sm:text-base font-bold text-slate-800 capitalize">
+                          {r.category.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(r.status)}
+                        <span className="text-xs text-slate-500">
+                          {new Date(r.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-lg uppercase">
-                      {s.wasteType}
-                    </span>
+
+                    <p className="text-sm text-slate-600 mb-2">{r.description || 'Appliance collection request'}</p>
+
+                    <div className="flex flex-wrap gap-4 text-xs text-slate-500 border-t border-slate-200 pt-3">
+                      <span><strong>Address:</strong> {r.address}</span>
+                      {r.preferredDate && <span><strong>Scheduled:</strong> {new Date(r.preferredDate).toLocaleDateString()} ({r.preferredTimeSlot})</span>}
+                      {r.assignedWorker && <span><strong>Assigned Driver:</strong> {r.assignedWorker.name}</span>}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Festival & Contingency Drives</h2>
-              <p className="text-sm text-slate-500 mb-4">Special cleanliness operations for Nashik religious gatherings & riverbank drives.</p>
-
-              <div className="space-y-3">
-                {events.map((ev) => (
-                  <div key={ev.id} className="p-4 bg-purple-50 rounded-2xl border border-purple-200">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-sm text-purple-900">{ev.name}</span>
-                      <span className="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded">
-                        +{Math.round((ev.expectedWasteMultiplier - 1) * 100)}% Surge
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-600 mb-2">{ev.description}</p>
-                    <div className="text-xs text-slate-500">
-                      Dates: {new Date(ev.startDate).toLocaleDateString()} to {new Date(ev.endDate).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         )}
 

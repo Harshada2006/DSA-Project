@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api/client.js';
+import { LeafletMap } from '../components/map/LeafletMap.jsx';
 import {
   Truck,
   CheckCircle2,
@@ -11,47 +12,63 @@ import {
   MapPin,
   Clock,
   Navigation,
-  FileCheck2,
-  ShieldCheck,
   RefreshCw,
   Camera,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ShieldAlert,
+  Search,
+  Check,
+  Building2,
+  FileCheck2,
 } from 'lucide-react';
 
 export const WorkerDashboard = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'record' | 'missed' | 'scan' | 'ewaste'
+  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'route' | 'record' | 'issue' | 'scan' | 'ewaste'
 
   // Data state
   const [tasks, setTasks] = useState([]);
   const [ewasteRequests, setEWasteRequests] = useState([]);
   const [facilities, setFacilities] = useState([]);
+  const [roadblocks, setRoadblocks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
 
-  // Collection form state
+  // Route state
+  const [routeResult, setRouteResult] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  // Collection form state (NO manual fillPercentage entry - Section 16)
   const [collectionForm, setCollectionForm] = useState({
-    fillPercentage: 85,
     weightKg: 120,
     wasteType: 'SOLID',
     notes: 'Cleared full bin into compactor truck',
-    photoUrl: '',
     gpsConsent: true,
   });
+  const [collectionSubmitting, setCollectionSubmitting] = useState(false);
 
-  // Missed form state
-  const [missedForm, setMissedForm] = useState({
-    reason: 'ROAD_BLOCKED',
-    notes: 'Narrow lane blocked by construction material, truck unable to enter.',
+  // Issue reporting form state (Section 12)
+  const [issueForm, setIssueForm] = useState({
+    issueType: 'blocked_road',
+    taskId: '',
+    binId: '',
+    description: '',
+    location: 'Nashik Municipal Area',
+    roadName: '',
   });
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
 
-  // QR / Code simulator state
-  const [scannedCode, setScannedCode] = useState('BIN-NSK-PAN-001');
+  // QR / Barcode Asset Scanner state (Section 13)
+  const [scanQuery, setScanQuery] = useState('');
   const [scannedBin, setScannedBin] = useState(null);
+  const [scanSearching, setScanSearching] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const videoRef = useRef(null);
 
-  // Recycler Handover state
+  // E-waste Handover state (Section 14)
   const [handoverForm, setHandoverForm] = useState({
     facilityId: '',
     wasteCategory: 'ELECTRONIC',
@@ -59,8 +76,9 @@ export const WorkerDashboard = () => {
     itemCount: 8,
     manifestNumber: `MNF-NSK-${Date.now().toString().slice(-6)}`,
     certificateNumber: `CERT-MPCB-${Date.now().toString().slice(-6)}`,
-    notes: 'Handover of weekly residential IT & home electronics',
+    notes: 'Handover of weekly residential IT & electronics',
   });
+  const [handoverSubmitting, setHandoverSubmitting] = useState(false);
 
   useEffect(() => {
     loadWorkerData();
@@ -68,15 +86,17 @@ export const WorkerDashboard = () => {
 
   const loadWorkerData = async () => {
     try {
-      const [tasksData, ewasteData, facData] = await Promise.all([
+      const [tasksData, ewasteData, facData, roadblocksData] = await Promise.all([
         api.getTasks().catch(() => []),
         api.getEWasteRequests().catch(() => []),
         api.getFacilities({ facilityType: 'RECYCLER' }).catch(() => []),
+        api.getActiveRoadblocks().catch(() => []),
       ]);
       setTasks(tasksData || []);
       setEWasteRequests(ewasteData || []);
       setFacilities(facData || []);
-      if (facData && facData.length > 0) {
+      setRoadblocks(roadblocksData || []);
+      if (facData && facData.length > 0 && !handoverForm.facilityId) {
         setHandoverForm((prev) => ({ ...prev, facilityId: facData[0].id }));
       }
     } catch (err) {
@@ -84,14 +104,43 @@ export const WorkerDashboard = () => {
     }
   };
 
+  // Compute or Recalculate Route with dynamic roadblock avoidance (Section 21)
+  const computeWorkerRoute = async (avoidBlocked = true) => {
+    const assignedBinIds = tasks
+      .filter((t) => t.status === 'PENDING' || t.status === 'STARTED' || t.status === 'IN_PROGRESS')
+      .map((t) => t.binId)
+      .filter(Boolean);
+
+    if (assignedBinIds.length === 0) {
+      setNotice({ type: 'error', text: 'No active assigned collection tasks found to route.' });
+      return;
+    }
+
+    setRouteLoading(true);
+    try {
+      const result = await api.optimizeRoute({
+        binIds: assignedBinIds,
+        avoidRoadblocks: avoidBlocked,
+        objective: 'distance',
+      });
+      setRouteResult(result);
+      if (result.isRerouted) {
+        setNotice({
+          type: 'success',
+          text: result.routingMessage || 'Alternative route calculated avoiding reported road closure(s).',
+        });
+      }
+    } catch (err) {
+      setNotice({ type: 'error', text: `Route calculation: ${err.message}` });
+    } finally {
+      setRouteLoading(false);
+    }
+  };
+
   const handleStartTask = async (task) => {
     try {
       const updated = await api.startTask(task.id);
       setSelectedTask(updated);
-      setCollectionForm((prev) => ({
-        ...prev,
-        fillPercentage: updated.bin?.currentFillPercentage || 75,
-      }));
       setActiveTab('record');
       setNotice({ type: 'success', text: `Task #${task.id.slice(0, 8)} marked IN_PROGRESS.` });
       loadWorkerData();
@@ -111,22 +160,20 @@ export const WorkerDashboard = () => {
       return;
     }
 
-    setLoading(true);
+    setCollectionSubmitting(true);
     try {
       await api.recordCollection(selectedTask.id, {
-        fillPercentage: collectionForm.fillPercentage,
-        weightKg: collectionForm.weightKg,
+        weightKg: parseFloat(collectionForm.weightKg) || 50,
         wasteType: collectionForm.wasteType,
         notes: collectionForm.notes,
-        photoUrl: collectionForm.photoUrl,
-        latitude: 19.9975,
-        longitude: 73.7898,
+        latitude: selectedTask.bin?.latitude || 19.9975,
+        longitude: selectedTask.bin?.longitude || 73.7898,
         gpsConsent: true,
       });
 
       setNotice({
         type: 'success',
-        text: `Collection recorded for ${selectedTask.bin?.code || 'Bin'}! Fill level reset to 0%.`,
+        text: `Collection successfully recorded for ${selectedTask.bin?.code || 'Bin'}! Task completed.`,
       });
       setSelectedTask(null);
       setActiveTab('tasks');
@@ -134,57 +181,124 @@ export const WorkerDashboard = () => {
     } catch (err) {
       setNotice({ type: 'error', text: err.message || 'Failed to record collection.' });
     } finally {
-      setLoading(false);
+      setCollectionSubmitting(false);
     }
   };
 
-  const handleReportMissed = async (e) => {
+  const handleReportIssue = async (e) => {
     e.preventDefault();
-    if (!selectedTask) {
-      setNotice({ type: 'error', text: 'Please select a task to report.' });
-      return;
-    }
-
-    setLoading(true);
+    setIssueSubmitting(true);
     try {
-      await api.reportMissedTask(selectedTask.id, missedForm);
+      const res = await api.reportIssue({
+        issueType: issueForm.issueType,
+        taskId: issueForm.taskId || (selectedTask ? selectedTask.id : undefined),
+        binId: issueForm.binId || (selectedTask?.bin ? selectedTask.bin.id : undefined),
+        description: issueForm.description.trim() || undefined,
+        location: issueForm.location.trim() || undefined,
+        roadName: issueForm.roadName.trim() || undefined,
+        latitude: 19.9975,
+        longitude: 73.7898,
+      });
+
       setNotice({
         type: 'success',
-        text: `Missed status logged for task #${selectedTask.id.slice(0, 8)}. Control room notified.`,
+        text: `Issue #${res.id?.slice(0, 8) || 'REF'} reported successfully! NMC dispatchers notified.`,
       });
-      setSelectedTask(null);
+
+      setIssueForm({
+        issueType: 'blocked_road',
+        taskId: '',
+        binId: '',
+        description: '',
+        location: 'Nashik Municipal Area',
+        roadName: '',
+      });
+
       setActiveTab('tasks');
       loadWorkerData();
     } catch (err) {
-      setNotice({ type: 'error', text: err.message || 'Failed to report missed task.' });
+      setNotice({ type: 'error', text: err.message || 'Failed to report issue.' });
     } finally {
-      setLoading(false);
+      setIssueSubmitting(false);
     }
   };
 
-  const handleSimulateScan = async (e) => {
-    e.preventDefault();
+  // Asset Scan: Real Camera stream or Manual Search (Section 13)
+  const startCameraScanner = async () => {
+    setCameraError(null);
     try {
-      const foundBins = await api.getBins({ search: scannedCode.trim() });
-      if (foundBins.length > 0) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access API is not supported by your browser. Please use manual code search.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      setCameraActive(true);
+    } catch (err) {
+      console.warn('Camera access unavailable:', err);
+      setCameraError(err.message || 'Camera permission denied or camera device unavailable. Please use the manual identifier fallback below.');
+      setCameraActive(false);
+    }
+  };
+
+  const stopCameraScanner = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  };
+
+  const handleManualScanLookup = async (e) => {
+    e.preventDefault();
+    if (!scanQuery.trim()) return;
+
+    setScanSearching(true);
+    setScannedBin(null);
+    try {
+      const foundBins = await api.getBins({ search: scanQuery.trim() });
+      if (foundBins && foundBins.length > 0) {
         setScannedBin(foundBins[0]);
-        setNotice({ type: 'success', text: `Bin ${foundBins[0].code} identified!` });
+        setNotice({ type: 'success', text: `Asset ${foundBins[0].code} identified in Nashik database!` });
       } else {
-        setNotice({ type: 'error', text: `No bin found matching "${scannedCode}".` });
+        setNotice({ type: 'error', text: `No registered asset found matching identifier "${scanQuery}".` });
       }
     } catch (err) {
-      setNotice({ type: 'error', text: err.message || 'Scan lookup failed.' });
+      setNotice({ type: 'error', text: err.message || 'Asset lookup failed.' });
+    } finally {
+      setScanSearching(false);
+    }
+  };
+
+  const handleMarkEWasteCollected = async (requestId) => {
+    try {
+      await api.recordEWasteCollection(requestId, {
+        actualWeightKg: 15,
+        notes: 'Collected from doorstep in compactor utility van',
+      });
+      setNotice({ type: 'success', text: 'E-Waste pickup marked COLLECTED! Ready for facility handover.' });
+      loadWorkerData();
+    } catch (err) {
+      setNotice({ type: 'error', text: err.message || 'Failed to update pickup status.' });
     }
   };
 
   const handleRecyclerHandover = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    if (!handoverForm.facilityId) {
+      setNotice({ type: 'error', text: 'Please select a destination facility.' });
+      return;
+    }
+
+    setHandoverSubmitting(true);
     try {
       await api.recordEWasteHandover(handoverForm);
       setNotice({
         type: 'success',
-        text: `Handover recorded! Manifest ${handoverForm.manifestNumber} archived with MPCB recycler.`,
+        text: `Handover recorded! Manifest #${handoverForm.manifestNumber} archived with verified facility.`,
       });
       setHandoverForm({
         facilityId: facilities[0]?.id || '',
@@ -195,17 +309,23 @@ export const WorkerDashboard = () => {
         certificateNumber: `CERT-MPCB-${Date.now().toString().slice(-6)}`,
         notes: 'Handover completed',
       });
+      loadWorkerData();
     } catch (err) {
       setNotice({ type: 'error', text: err.message || 'Failed to log recycler handover.' });
     } finally {
-      setLoading(false);
+      setHandoverSubmitting(false);
     }
   };
 
+  // Polyline for suggested route
+  const routePolyline = routeResult?.ordered_stops
+    ? routeResult.ordered_stops.map((s) => [s.latitude, s.longitude])
+    : [];
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Mobile Top Header */}
-      <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-30">
+      {/* Top Header */}
+      <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-30 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-500 flex items-center justify-center font-bold text-slate-950 text-xl shadow-lg shadow-amber-900/40">
@@ -226,7 +346,7 @@ export const WorkerDashboard = () => {
 
           <button
             onClick={logout}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />
@@ -235,15 +355,12 @@ export const WorkerDashboard = () => {
         </div>
       </header>
 
-      {/* Visual Shift Banner with Compactor Truck Photo */}
+      {/* Visual Shift Banner */}
       <div className="relative border-b border-slate-800 bg-gradient-to-r from-amber-950 via-slate-900 to-slate-950 overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-25 pointer-events-none">
-          <img src="/assets/worker_truck.jpg" alt="Municipal Compactor" className="w-full h-full object-cover" />
-        </div>
         <div className="max-w-4xl mx-auto p-4 sm:p-5 relative z-10 flex items-center justify-between">
           <div>
             <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block mb-1 border border-amber-500/30">
-              On-Shift Active
+              Active Shift
             </span>
             <h2 className="text-lg sm:text-xl font-bold text-white">Daily Waste Collection Tour</h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
@@ -252,7 +369,7 @@ export const WorkerDashboard = () => {
           </div>
           <button
             onClick={loadWorkerData}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition-colors"
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Refresh Queue
@@ -271,12 +388,12 @@ export const WorkerDashboard = () => {
         </div>
       )}
 
-      {/* Bottom/Top Tab Navigation - Bigger & Touch-Friendly */}
+      {/* Touch-Friendly Tab Navigation */}
       <div className="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-2.5 sticky top-16 z-20">
         <div className="max-w-4xl mx-auto flex overflow-x-auto gap-2 no-scrollbar">
           <button
             onClick={() => setActiveTab('tasks')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'tasks' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
             }`}
           >
@@ -285,8 +402,21 @@ export const WorkerDashboard = () => {
           </button>
 
           <button
+            onClick={() => {
+              setActiveTab('route');
+              if (!routeResult) computeWorkerRoute(true);
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'route' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
+            }`}
+          >
+            <Navigation className="w-4 h-4" />
+            Suggested Route
+          </button>
+
+          <button
             onClick={() => setActiveTab('record')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'record' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
             }`}
           >
@@ -295,9 +425,9 @@ export const WorkerDashboard = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('missed')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-              activeTab === 'missed' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
+            onClick={() => setActiveTab('issue')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'issue' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
             }`}
           >
             <AlertTriangle className="w-4 h-4" />
@@ -306,7 +436,7 @@ export const WorkerDashboard = () => {
 
           <button
             onClick={() => setActiveTab('scan')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'scan' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
             }`}
           >
@@ -316,7 +446,7 @@ export const WorkerDashboard = () => {
 
           <button
             onClick={() => setActiveTab('ewaste')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'ewaste' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-800/50'
             }`}
           >
@@ -342,7 +472,7 @@ export const WorkerDashboard = () => {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center text-slate-400">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
                 <p className="font-bold text-base text-white">All collection tasks cleared!</p>
-                <p className="text-sm text-slate-400 mt-1">Check back as our C++ heap generates new priority tasks.</p>
+                <p className="text-sm text-slate-400 mt-1">Check back as new priority collection tasks are dispatched.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -384,8 +514,8 @@ export const WorkerDashboard = () => {
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-2xl font-bold font-mono text-amber-400">{fill}%</span>
-                          <span className="block text-[11px] text-slate-400 uppercase">Fill Level</span>
+                          <span className="text-xs text-slate-400 block uppercase">Est. Fill</span>
+                          <span className="text-xl font-bold font-mono text-amber-400">~{fill}%</span>
                         </div>
                       </div>
 
@@ -422,14 +552,116 @@ export const WorkerDashboard = () => {
           </div>
         )}
 
-        {/* Tab 2: Record Collection Form */}
+        {/* Tab 2: Suggested Route & Dynamic Roadblock Rerouting (Sections 20 & 21) */}
+        {activeTab === 'route' && (
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-5 rounded-3xl">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Navigation className="w-5 h-5 text-amber-400" />
+                  Suggested Collection Route & Road Conditions
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Greedy nearest-stop tour over Nashik Road Network with automatic road closure avoidance.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => computeWorkerRoute(true)}
+                  disabled={routeLoading}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${routeLoading ? 'animate-spin' : ''}`} />
+                  Recalculate Alternative Route
+                </button>
+              </div>
+            </div>
+
+            {/* Roadblock Warning Banner if Active Road Closures */}
+            {roadblocks.length > 0 && (
+              <div className="p-4 bg-rose-950/40 border border-rose-500/50 rounded-2xl flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-rose-200">
+                  <strong className="block text-sm font-bold text-rose-300">
+                    Active Roadblocks Detected ({roadblocks.length})
+                  </strong>
+                  The routing engine automatically excludes reported closures and directs compactor trucks via safe alternative road segments.
+                </div>
+              </div>
+            )}
+
+            {/* Map Display */}
+            <div className="h-96 rounded-3xl overflow-hidden border border-slate-800 shadow-xl relative">
+              <LeafletMap
+                bins={tasks.map((t) => t.bin).filter(Boolean)}
+                routePath={routePolyline}
+                routeStops={routeResult?.ordered_stops || []}
+                center={[19.9975, 73.7898]}
+                zoom={13}
+                className="h-full w-full"
+              />
+            </div>
+
+            {/* Route Summary & Stops */}
+            {routeResult && (
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-xs text-slate-400 block uppercase">Tour Metric</span>
+                    <span className="font-bold text-white text-sm">
+                      {routeResult.total_distance_km ? `${routeResult.total_distance_km.toFixed(1)} km` : 'Multi-Stop Tour'} • 
+                      ~{Math.round(routeResult.total_time_minutes || 25)} mins
+                    </span>
+                  </div>
+                  {routeResult.isRerouted && (
+                    <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-full">
+                      Alternative Route Active
+                    </span>
+                  )}
+                </div>
+
+                {/* Ordered Stops List */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Sequential Collection Stops
+                  </h4>
+                  <div className="space-y-2">
+                    {(routeResult.ordered_stops || []).map((stop, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold flex items-center justify-center text-xs">
+                            {stop.type === 'depot' ? 'D' : idx}
+                          </span>
+                          <div>
+                            <span className="font-bold text-white block">{stop.name}</span>
+                            <span className="text-slate-500">{stop.type === 'depot' ? 'Starting Municipal Depot' : 'Collection Target'}</span>
+                          </div>
+                        </div>
+                        {idx === 1 && (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold rounded text-[10px] border border-emerald-500/30">
+                            NEXT STOP
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Record Collection Form (NO manual percentage - Section 16) */}
         {activeTab === 'record' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
             <h2 className="text-lg font-bold text-white mb-1">
               Field Collection Verification
             </h2>
             <p className="text-sm text-slate-400 mb-6">
-              Record physical emptying of bin asset into compaction truck.
+              Record physical emptying of bin asset into compaction truck. Fill level is reset to 0% upon verified collection.
             </p>
 
             {selectedTask ? (
@@ -441,6 +673,9 @@ export const WorkerDashboard = () => {
                   <div>
                     <h4 className="font-mono font-bold text-base text-white">{selectedTask.bin?.code}</h4>
                     <p className="text-sm text-slate-300">{selectedTask.bin?.name}</p>
+                    <p className="text-xs text-emerald-400 mt-1">
+                      Expected fill tomorrow (24h horizon): ~{selectedTask.bin?.currentFillPercentage || 70}%
+                    </p>
                   </div>
                   <span className="text-xs bg-slate-700 text-slate-200 px-3 py-1 rounded-lg font-mono">
                     Task #{selectedTask.id.slice(0, 8)}
@@ -449,31 +684,18 @@ export const WorkerDashboard = () => {
               </div>
             ) : (
               <div className="mb-6 p-4 bg-amber-950/30 border border-amber-500/40 rounded-2xl text-sm text-amber-300">
-                Tip: Select a task from the "Assigned Queue" tab first to auto-link the bin code.
+                Tip: Select a task from the "Assigned Queue" tab to record verified collection.
               </div>
             )}
 
             <form onSubmit={handleRecordCollection} className="space-y-5 text-sm">
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1.5">
-                  Observed Fill Before Emptying: <strong className="text-amber-400 text-base">{collectionForm.fillPercentage}%</strong>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={collectionForm.fillPercentage}
-                  onChange={(e) => setCollectionForm({ ...collectionForm, fillPercentage: parseInt(e.target.value, 10) })}
-                  className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg"
-                />
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-1.5">Collected Net Weight (kg)</label>
+                  <label className="block text-sm font-semibold text-slate-300 mb-1.5">Collected Net Weight (kg) *</label>
                   <input
                     type="number"
                     min="1"
+                    required
                     value={collectionForm.weightKg}
                     onChange={(e) => setCollectionForm({ ...collectionForm, weightKg: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
@@ -481,7 +703,7 @@ export const WorkerDashboard = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-1.5">Waste Stream</label>
+                  <label className="block text-sm font-semibold text-slate-300 mb-1.5">Waste Stream *</label>
                   <select
                     value={collectionForm.wasteType}
                     onChange={(e) => setCollectionForm({ ...collectionForm, wasteType: e.target.value })}
@@ -496,7 +718,9 @@ export const WorkerDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1.5">Field Inspection Notes</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-1.5">
+                  Field Inspection Notes <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
                 <input
                   type="text"
                   value={collectionForm.notes}
@@ -513,60 +737,90 @@ export const WorkerDashboard = () => {
                   id="gpsConsent"
                   checked={collectionForm.gpsConsent}
                   onChange={(e) => setCollectionForm({ ...collectionForm, gpsConsent: e.target.checked })}
-                  className="mt-1 rounded accent-amber-500 h-5 w-5"
+                  className="mt-1 rounded accent-amber-500 h-5 w-5 cursor-pointer"
                 />
                 <label htmlFor="gpsConsent" className="text-sm text-slate-300 cursor-pointer">
                   <strong className="text-white block">GPS Verification Consent</strong>
-                  I confirm that I am physically present at this Nashik bin coordinate and consent to attaching device verification telemetry to this municipal collection record.
+                  I confirm physical presence at this collection point in Nashik and authorize attaching location telemetry to this municipal collection record.
                 </label>
               </div>
 
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-base rounded-2xl shadow-lg transition-all cursor-pointer"
+                  disabled={collectionSubmitting || !selectedTask}
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-base rounded-2xl shadow-lg transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? 'Submitting Verification...' : '✓ Complete Collection & Empty Bin'}
+                  {collectionSubmitting ? 'Recording Verification...' : '✓ Complete Collection & Empty Bin'}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Tab 3: Report Missed or Blocked */}
-        {activeTab === 'missed' && (
+        {/* Tab 4: Report Issue (Section 12) */}
+        {activeTab === 'issue' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-            <h2 className="text-lg font-bold text-white mb-1">Report Missed or Blocked Bin</h2>
+            <h2 className="text-lg font-bold text-white mb-1">Report Operational Issue or Roadblock</h2>
             <p className="text-sm text-slate-400 mb-6">
-              Log reasons why collection could not be completed so dispatchers can reroute or deploy auxiliary equipment.
+              Report blocked roads, damaged bins, or vehicle issues so control room dispatchers can reroute vehicles or deploy maintenance.
             </p>
 
-            <form onSubmit={handleReportMissed} className="space-y-4 text-sm">
+            <form onSubmit={handleReportIssue} className="space-y-4 text-sm">
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1.5">Incident Reason *</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-1.5">Issue Type *</label>
                 <select
-                  value={missedForm.reason}
-                  onChange={(e) => setMissedForm({ ...missedForm, reason: e.target.value })}
+                  value={issueForm.issueType}
+                  onChange={(e) => setIssueForm({ ...issueForm, issueType: e.target.value })}
                   className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
                 >
-                  <option value="ROAD_BLOCKED">Narrow Lane / Road Blocked by Construction</option>
-                  <option value="VEHICLE_BREAKDOWN">Vehicle Mechanical Failure / Flat Tire</option>
-                  <option value="INACCESSIBLE_BIN">Bin Inaccessible (Locked gate or parked car)</option>
-                  <option value="EXCESS_OVERFLOW">Overflow Exceeds Truck Capacity (Requires Loader)</option>
-                  <option value="CIVIC_EVENT">Procession or Market Day Traffic Restriction</option>
-                  <option value="OTHER">Other Operational Impairment</option>
+                  <option value="blocked_road">Blocked Road / Construction Closure</option>
+                  <option value="damaged_bin">Damaged or Broken Bin Asset</option>
+                  <option value="inaccessible_point">Inaccessible Collection Point</option>
+                  <option value="unsafe_location">Unsafe Location / Hazard</option>
+                  <option value="incorrect_map">Incorrect Map Location</option>
+                  <option value="vehicle_problem">Vehicle Mechanical Issue</option>
+                  <option value="other">Other Operational Issue</option>
                 </select>
               </div>
 
+              {issueForm.issueType === 'blocked_road' && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-300 mb-1.5">
+                    Road / Street Name Affected
+                  </label>
+                  <input
+                    type="text"
+                    value={issueForm.roadName}
+                    onChange={(e) => setIssueForm({ ...issueForm, roadName: e.target.value })}
+                    placeholder="e.g. Gangapur Road near Jehan Circle"
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
+                  />
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1.5">Explanation & Notes</label>
+                <label className="block text-sm font-semibold text-slate-300 mb-1.5">
+                  Location / Landmark
+                </label>
+                <input
+                  type="text"
+                  value={issueForm.location}
+                  onChange={(e) => setIssueForm({ ...issueForm, location: e.target.value })}
+                  placeholder="e.g. Near Panchavati Karanja Market"
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-1.5">
+                  Description & Details <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
                 <textarea
                   rows={3}
-                  required
-                  value={missedForm.notes}
-                  onChange={(e) => setMissedForm({ ...missedForm, notes: e.target.value })}
-                  placeholder="Provide details for the municipal control room..."
+                  value={issueForm.description}
+                  onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })}
+                  placeholder="Explain the obstacle or condition to help reroute and resolve..."
                   className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white resize-none"
                 />
               </div>
@@ -574,40 +828,93 @@ export const WorkerDashboard = () => {
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={issueSubmitting}
                   className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm rounded-xl shadow transition-colors cursor-pointer"
                 >
-                  {loading ? 'Logging Issue...' : 'Submit Missed Collection Report'}
+                  {issueSubmitting ? 'Submitting Report...' : 'Submit Operational Issue'}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Tab 4: QR Scanner Simulator */}
+        {/* Tab 5: QR Code & Asset Scanner (Section 13) */}
         {activeTab === 'scan' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-            <h2 className="text-lg font-bold text-white mb-1">QR Code & Bin ID Asset Lookup</h2>
+            <h2 className="text-lg font-bold text-white mb-1">Asset Scanner & Bin Identifier</h2>
             <p className="text-sm text-slate-400 mb-6">
-              Simulate scanning barcode or RFID tags attached to Nashik municipal bins.
+              Scan barcode/QR code tags or enter asset codes manually to view bin details and verify collection.
             </p>
 
-            <form onSubmit={handleSimulateScan} className="flex gap-2 mb-6">
-              <input
-                type="text"
-                value={scannedCode}
-                onChange={(e) => setScannedCode(e.target.value)}
-                placeholder="BIN-NSK-PAN-001"
-                className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-white"
-              />
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl transition-colors cursor-pointer"
-              >
-                Scan Asset
-              </button>
-            </form>
+            {/* Camera Scanner Section */}
+            <div className="mb-6 p-4 bg-slate-950 rounded-2xl border border-slate-800">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-amber-400" />
+                  <span className="font-bold text-sm text-white">Camera QR Scanner</span>
+                </div>
+                {cameraActive ? (
+                  <button
+                    onClick={stopCameraScanner}
+                    className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    Stop Camera
+                  </button>
+                ) : (
+                  <button
+                    onClick={startCameraScanner}
+                    className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-lg cursor-pointer"
+                  >
+                    Start Camera
+                  </button>
+                )}
+              </div>
 
+              {cameraActive && (
+                <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-w-sm mx-auto mb-3">
+                  <video ref={videoRef} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 border-2 border-amber-400/60 rounded-xl pointer-events-none flex items-center justify-center">
+                    <span className="text-xs bg-slate-900/80 px-2 py-1 rounded text-amber-300">
+                      Align QR or barcode within frame
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {cameraError && (
+                <div className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-xl text-xs text-amber-300">
+                  {cameraError}
+                </div>
+              )}
+            </div>
+
+            {/* Manual Identifier Fallback */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Manual Identifier Fallback
+              </label>
+              <form onSubmit={handleManualScanLookup} className="flex gap-2 mb-6">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-500" />
+                  <input
+                    type="text"
+                    value={scanQuery}
+                    onChange={(e) => setScanQuery(e.target.value)}
+                    placeholder="Enter bin code (e.g. BIN-NSK-PAN-001)"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={scanSearching}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl transition-colors cursor-pointer"
+                >
+                  {scanSearching ? 'Looking up...' : 'Lookup'}
+                </button>
+              </form>
+            </div>
+
+            {/* Scanned Bin Details Card */}
             {scannedBin && (
               <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-start">
@@ -617,44 +924,92 @@ export const WorkerDashboard = () => {
                     <p className="text-xs text-slate-400">{scannedBin.ward?.name} • Area: {scannedBin.areaCategory}</p>
                   </div>
                   <span className="text-xs font-mono font-bold bg-slate-800 text-slate-200 px-3 py-1 rounded-lg">
-                    Score: {scannedBin.priorityScore || 0}
+                    Priority: {Math.round(scannedBin.priorityScore || 0)}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-800">
-                  <div>Fill: <strong className="text-white text-sm">{scannedBin.currentFillPercentage}%</strong></div>
+                  <div>Expected Fill: <strong className="text-white text-sm">{scannedBin.currentFillPercentage}%</strong></div>
                   <div>Capacity: <strong className="text-white text-sm">{scannedBin.capacityLiters}L</strong></div>
                 </div>
 
                 <button
                   onClick={() => {
-                    setSelectedTask({ bin: scannedBin, id: 'temp-adhoc-task' });
+                    setSelectedTask({ bin: scannedBin, id: 'adhoc-scanned-task' });
                     setActiveTab('record');
                   }}
                   className="w-full mt-3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl transition-colors cursor-pointer"
                 >
-                  Log Collection for This Scanned Bin
+                  Proceed to Record Collection for This Bin
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Tab 5: E-Waste & Recycler Handover */}
+        {/* Tab 6: E-Waste Handover (Section 14) */}
         {activeTab === 'ewaste' && (
           <div className="space-y-6">
+            {/* Assigned E-Waste Pickups */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h3 className="text-base font-bold text-white mb-1">Assigned Residential E-Waste Pickups</h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Doorstep pickup tasks assigned to your collection route.
+              </p>
+
+              {ewasteRequests.length === 0 ? (
+                <p className="text-xs text-slate-500 italic py-4">No e-waste collection requests currently pending.</p>
+              ) : (
+                <div className="space-y-3">
+                  {ewasteRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-amber-400 text-xs">
+                            {req.trackingNumber || `EW-${req.id.slice(0, 8)}`}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-200 uppercase font-semibold">
+                            {req.status}
+                          </span>
+                        </div>
+                        <h5 className="font-bold text-sm text-white mt-1 capitalize">{req.category.replace(/_/g, ' ')}</h5>
+                        <p className="text-xs text-slate-400">{req.address}</p>
+                      </div>
+
+                      {req.status === 'ASSIGNED' || req.status === 'SUBMITTED' ? (
+                        <button
+                          onClick={() => handleMarkEWasteCollected(req.id)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow cursor-pointer whitespace-nowrap"
+                        >
+                          Mark Collected
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold text-teal-400 flex items-center gap-1">
+                          <Check className="w-4 h-4" /> Ready for Handover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Handover Form */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
               <h2 className="text-lg font-bold text-white mb-1">
-                Handover to Verified MPCB Recycler
+                Handover to Verified Facility
               </h2>
               <p className="text-sm text-slate-400 mb-6">
-                Log delivery of residential e-waste from NMC vehicles to MPCB registered processors.
+                Log transfer of collected electronics to verified downstream recyclers or dismantlers in Nashik.
               </p>
 
               <form onSubmit={handleRecyclerHandover} className="space-y-4 text-sm">
                 <div>
                   <label className="block text-sm font-semibold text-slate-300 mb-1.5">
-                    Select Authorized Recycler Destination *
+                    Select Destination Facility *
                   </label>
                   <select
                     required
@@ -664,7 +1019,7 @@ export const WorkerDashboard = () => {
                   >
                     {facilities.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.name} ({f.licenseNumber || 'MPCB Authorized'})
+                        {f.name} ({f.verificationStatus ? f.verificationStatus.toUpperCase() : 'PENDING'} • {f.area || 'Nashik'})
                       </option>
                     ))}
                   </select>
@@ -672,10 +1027,11 @@ export const WorkerDashboard = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Total Weight (kg)</label>
+                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Total Weight (kg) *</label>
                     <input
                       type="number"
                       min="1"
+                      required
                       value={handoverForm.weightKg}
                       onChange={(e) => setHandoverForm({ ...handoverForm, weightKg: parseFloat(e.target.value) || 0 })}
                       className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
@@ -683,10 +1039,11 @@ export const WorkerDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Item Count</label>
+                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Item Count *</label>
                     <input
                       type="number"
                       min="1"
+                      required
                       value={handoverForm.itemCount}
                       onChange={(e) => setHandoverForm({ ...handoverForm, itemCount: parseInt(e.target.value, 10) || 1 })}
                       className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
@@ -696,7 +1053,7 @@ export const WorkerDashboard = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Manifest Document #</label>
+                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Manifest Number *</label>
                     <input
                       type="text"
                       required
@@ -707,7 +1064,7 @@ export const WorkerDashboard = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">MPCB Certificate #</label>
+                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">Transfer Certificate # *</label>
                     <input
                       type="text"
                       required
@@ -721,10 +1078,10 @@ export const WorkerDashboard = () => {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={handoverSubmitting}
                     className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-sm rounded-xl shadow transition-all cursor-pointer"
                   >
-                    {loading ? 'Recording Handover...' : 'Archive Handover & Issue Manifest'}
+                    {handoverSubmitting ? 'Recording Handover...' : 'Archive Handover & Issue Manifest'}
                   </button>
                 </div>
               </form>

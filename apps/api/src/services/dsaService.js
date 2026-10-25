@@ -10,7 +10,7 @@ export class DsaService {
   }
 
   /**
-   * Run C++ Max-Heap 4-Factor Priority Queue algorithm to rank waste collection tasks
+   * Run 4-factor collection priority ranking
    * (Overflow 40%, Pickup Delay 25%, Sensitive Location 20%, Missed Pickups 15%)
    */
   async getPrioritizedTasks(options = {}) {
@@ -33,7 +33,6 @@ export class DsaService {
 
     const now = new Date();
 
-    // Map tasks into payload for C++ engine
     const tasksPayload = bins.map((bin) => {
       let hoursSinceCollection = 24.0;
       if (bin.lastCollectedAt) {
@@ -45,10 +44,8 @@ export class DsaService {
         freshnessHours = (now.getTime() - new Date(bin.lastObservedAt).getTime()) / (1000 * 3600);
       }
 
-      // Linear predicted fill
       const predicted = Math.min(100.0, bin.currentFillPercentage + 15.0);
 
-      // Sensitive location score
       let sensitiveScore = -1.0;
       if (bin.areaCategory === 'pilgrimage') sensitiveScore = 90.0;
       else if (bin.areaCategory === 'market') sensitiveScore = 80.0;
@@ -87,29 +84,28 @@ export class DsaService {
       tasks: tasksPayload,
     };
 
-    // Execute compiled C++ DSA Engine
     const cppRes = await executeCppEngine('prioritize', cppInput);
 
     if (!cppRes.success) {
-      throw new Error(`C++ DSA Engine prioritization failed: ${cppRes.error}`);
+      throw new Error(`Priority calculation failed: ${cppRes.error}`);
     }
 
     return {
       tasks: cppRes.data.ranked_tasks || [],
       count: cppRes.data.count || 0,
       executionTimeMs: cppRes.data.execution_time_ms || cppRes.executionTimeMs,
-      algorithm: cppRes.data.algorithm || 'Max-Heap Priority Queue (C++ STL)',
-      timeComplexity: cppRes.data.time_complexity || 'O(N log N)',
+      rankingMethod: 'Collection Priority Scoring (4-Factor Model)',
       weightsUsed: cppInput.weights,
     };
   }
 
   /**
-   * Run C++ Dijkstra's algorithm for shortest path between graph nodes
+   * Shortest path with dynamic roadblock avoidance
    */
-  async getShortestPath(sourceId, targetId, useTime = false) {
+  async getShortestPath(sourceId, targetId, useTime = false, avoidBlocked = true) {
     const nodes = await prisma.roadNode.findMany();
-    const edges = await prisma.roadEdge.findMany();
+    const edgeFilter = avoidBlocked ? { isBlocked: false } : {};
+    const edges = await prisma.roadEdge.findMany({ where: edgeFilter });
 
     const graphPayload = {
       nodes: nodes.map((n) => ({
@@ -150,15 +146,28 @@ export class DsaService {
   }
 
   /**
-   * Run C++ Multi-Stop Route Optimizer (Dijkstra + Greedy Nearest-Next-Stop Heuristic)
+   * Multi-Stop Route Optimizer with Dynamic Roadblock Rerouting
    */
   async getOptimizedRoute(request) {
     const nodes = await prisma.roadNode.findMany();
-    const edges = await prisma.roadEdge.findMany();
+
+    // Check for blocked roads to avoid
+    const avoidRoadblocks = request.avoidRoadblocks !== false;
+    const blockedEdges = await prisma.roadEdge.findMany({ where: { isBlocked: true } });
+    const blockedEdgeIds = new Set(blockedEdges.map((e) => e.id));
+
+    if (Array.isArray(request.blockedEdgeIds)) {
+      request.blockedEdgeIds.forEach((id) => blockedEdgeIds.add(id));
+    }
+
+    const allEdges = await prisma.roadEdge.findMany();
+    const activeEdges = avoidRoadblocks
+      ? allEdges.filter((e) => !blockedEdgeIds.has(e.id))
+      : allEdges;
 
     // Fetch candidate bins
     const bins = await prisma.bin.findMany({
-      where: { id: { in: request.binIds } },
+      where: { id: { in: request.binIds || [] } },
     });
 
     const depot = request.startingDepot || {
@@ -175,7 +184,7 @@ export class DsaService {
         latitude: n.latitude,
         longitude: n.longitude,
       })),
-      edges: edges.map((e) => ({
+      edges: activeEdges.map((e) => ({
         id: e.id,
         source: e.sourceNodeId,
         target: e.targetNodeId,
@@ -193,7 +202,7 @@ export class DsaService {
         name: b.name,
         latitude: b.latitude,
         longitude: b.longitude,
-        demand_kg: Math.round((b.currentFillPercentage / 100.0) * (b.capacityLiters * 0.35)), // approx density
+        demand_kg: Math.round(((b.currentFillPercentage || 50) / 100.0) * (b.capacityLiters * 0.35)),
       })),
       max_stops: request.maxStops || 0,
       capacity_limit_kg: request.capacityLimitKg || 0,
@@ -204,10 +213,20 @@ export class DsaService {
     const cppRes = await executeCppEngine('optimize-route', cppInput);
 
     if (!cppRes.success) {
-      throw new Error(`C++ Route Optimizer execution failed: ${cppRes.error}`);
+      throw new Error(`Route calculation failed: ${cppRes.error}`);
     }
 
-    return cppRes.data;
+    const data = cppRes.data;
+    const isRerouted = blockedEdgeIds.size > 0;
+
+    return {
+      ...data,
+      isRerouted,
+      blockedRoadsAvoidedCount: blockedEdgeIds.size,
+      routingMessage: isRerouted
+        ? `Alternative route calculated avoiding ${blockedEdgeIds.size} reported road closure(s).`
+        : 'Suggested collection route calculated along verified road network.',
+    };
   }
 }
 

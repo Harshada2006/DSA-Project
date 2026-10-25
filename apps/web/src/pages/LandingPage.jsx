@@ -6,19 +6,14 @@ import {
   Briefcase,
   User,
   MapPin,
-  Sparkles,
   Route,
   Recycle,
   CheckCircle2,
-  AlertTriangle,
   ArrowRight,
-  Cpu,
   Layers,
-  Clock,
   Building2,
-  FileText,
-  ExternalLink,
   Truck,
+  Sparkles,
 } from 'lucide-react';
 import { Navbar } from '../components/layout/Navbar.jsx';
 import { LeafletMap } from '../components/map/LeafletMap.jsx';
@@ -28,7 +23,6 @@ export const LandingPage = () => {
   const [bins, setBins] = useState([]);
   const [wards, setWards] = useState([]);
   const [facilities, setFacilities] = useState([]);
-  const [activeSegregationTab, setActiveSegregationTab] = useState('wet');
 
   useEffect(() => {
     Promise.all([api.getBins(), api.getWards(), api.getFacilities()])
@@ -44,28 +38,28 @@ export const LandingPage = () => {
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
       <Navbar />
 
-      {/* Hero Section with Beautiful Visual Banner */}
+      {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50 via-white to-slate-50 pt-10 pb-16 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-xs sm:text-sm font-semibold text-emerald-900 mb-6 shadow-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-xs sm:text-sm font-semibold text-emerald-900 mb-6 shadow-xs">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
               Civic Technology Platform for Nashik Municipal Corporation (NMC)
             </div>
 
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              Smart Waste Logistics & Priority Routing for{' '}
+              Smart Waste Management & Collection Logistics for{' '}
               <span className="text-emerald-700 underline decoration-emerald-400 decoration-wavy decoration-2">
                 Nashik City
               </span>
             </h1>
 
             <p className="mt-5 text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
-              EcoNexus connects <strong>Nashik citizens</strong>, <strong>municipal drivers</strong>, and <strong>civic administrators</strong> on an explainable, data-driven platform. Powered by C++17 Max-Heap 4-factor prioritization, Dijkstra shortest path routing, and regulated MPCB e-waste channels.
+              EcoNexus connects <strong>Nashik citizens</strong>, <strong>municipal collection crews</strong>, and <strong>civic administrators</strong> on a unified civic platform. Facilitating transparent grievance resolution, dynamic collection planning, and regulated e-waste stewardship.
             </p>
 
             {/* Hero Visual Image Banner */}
-            <div className="mt-8 relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white max-h-[380px]">
+            <div className="mt-8 relative rounded-3xl overflow-hidden shadow-xl border-4 border-white max-h-[360px]">
               <img
                 src="/assets/nashik_hero.jpg"
                 alt="Scenic Godavari Riverfront Nashik"
@@ -76,15 +70,15 @@ export const LandingPage = () => {
                   <span className="bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block mb-2">
                     Clean Nashik Mission
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-bold">Preserving Godavari Riverfront & Pilgrimage Corridors</h3>
+                  <h2 className="text-xl sm:text-2xl font-bold">Preserving Godavari Riverfront & Pilgrimage Corridors</h2>
                   <p className="text-xs sm:text-sm text-slate-200 mt-1">
-                    Specialized algorithmic collection protection across Panchavati Ramkund, CIDCO, Satpur, and Nashik Road wards.
+                    Coordinated waste management across Panchavati, CIDCO, Satpur, Nashik Road, and Nashik West.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* 3 Dedicated Stakeholder Entry Cards with Images */}
+            {/* 3 Dedicated Stakeholder Entry Portals */}
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
               {/* Citizen Card */}
               <div className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md hover:shadow-xl hover:border-emerald-500 transition-all group flex flex-col justify-between">
@@ -94,7 +88,7 @@ export const LandingPage = () => {
                     alt="Citizen Ward Reporting"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute top-3 left-3 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">
+                  <div className="absolute top-3 left-3 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-xs">
                     Citizen Services
                   </div>
                 </div>
@@ -104,14 +98,14 @@ export const LandingPage = () => {
                       Citizen Civic Portal
                     </h3>
                     <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                      Report overflowing bins, schedule doorstep e-waste pickups, track complaint ticket statuses, and view collection schedules.
+                      Report waste grievances, book doorstep e-waste pickups, track ticket progress in real-time, and locate public drop-off centers.
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-emerald-700">Passwordless OTP</span>
+                    <span className="text-xs font-semibold text-emerald-700">Password Login & Signup</span>
                     <Link
                       to="/citizen/login"
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold transition-colors shadow"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold transition-colors shadow-xs"
                     >
                       Enter Portal <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -127,24 +121,24 @@ export const LandingPage = () => {
                     alt="Municipal Field Operations"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute top-3 left-3 bg-amber-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full shadow">
+                  <div className="absolute top-3 left-3 bg-amber-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full shadow-xs">
                     Field Crew
                   </div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
-                      Worker Field Console
+                      Worker Sign In
                     </h3>
                     <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                      Mobile-first console for sanitation crews. View assigned collection tasks, record collected waste weight, log GPS consent, and scan bins.
+                      Mobile-first field console. Review assigned tasks, follow suggested collection routes, scan assets, and log recycler handovers.
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-amber-700">Worker ID & Org Code</span>
+                    <span className="text-xs font-semibold text-amber-700">Worker ID & Password</span>
                     <Link
                       to="/worker/login"
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold transition-colors shadow"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold transition-colors shadow-xs"
                     >
                       Worker Login <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -160,7 +154,7 @@ export const LandingPage = () => {
                     alt="Municipal Command Center"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
                   />
-                  <div className="absolute top-3 left-3 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full shadow">
+                  <div className="absolute top-3 left-3 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full shadow-xs">
                     NMC Officers
                   </div>
                 </div>
@@ -170,14 +164,14 @@ export const LandingPage = () => {
                       Organization Admin
                     </h3>
                     <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-                      Operations command room: run C++ Max-Heap priority queue, generate Dijkstra shortest routes, dispatch tasks, and log MPCB handovers.
+                      Operations command portal. Review citizen complaints, assign collection tasks, manage authorized workers, and monitor operational analytics.
                     </p>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-400">Officer Credentials</span>
+                    <span className="text-xs font-medium text-slate-400">Admin Credentials</span>
                     <Link
                       to="/organization/login"
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition-colors shadow"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition-colors shadow-xs"
                     >
                       Admin Sign In <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -186,23 +180,23 @@ export const LandingPage = () => {
               </div>
             </div>
 
-            {/* Quick Metrics */}
+            {/* Operational Metrics */}
             <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                 <div className="text-3xl font-extrabold text-slate-900">6 Wards</div>
-                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">NMC Administrative Divisions</div>
+                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Municipal Administrative Divisions</div>
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="text-3xl font-extrabold text-emerald-700">4 Factors</div>
-                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">C++17 Max-Heap Prioritization</div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="text-3xl font-extrabold text-emerald-700">Priority Ranked</div>
+                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Automated Collection Scheduling</div>
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="text-3xl font-extrabold text-slate-900">0 Sensors</div>
-                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Zero Hardware Claim / Honest Provenance</div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="text-3xl font-extrabold text-slate-900">Predictive</div>
+                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Expected Fill & Overflow Estimates</div>
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="text-3xl font-extrabold text-purple-700">MPCB Verified</div>
-                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Authorized E-Waste Processors</div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="text-3xl font-extrabold text-emerald-800">Regulated</div>
+                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Authorized E-Waste Channels</div>
               </div>
             </div>
           </div>
@@ -220,7 +214,7 @@ export const LandingPage = () => {
               Interactive Geospatial Asset Map
             </h2>
             <p className="text-sm text-slate-600 mt-2">
-              Explore municipal bins, waste transfer facilities, and MPCB e-waste recyclers mapped across Nashik.
+              Explore municipal collection points, transfer stations, and authorized e-waste destination facilities across Nashik.
             </p>
           </div>
 
@@ -235,7 +229,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Public Footer */}
       <footer className="bg-slate-950 text-white py-10 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-slate-400">
           <div className="flex items-center gap-2">
@@ -243,10 +237,10 @@ export const LandingPage = () => {
               E
             </div>
             <span className="text-white font-bold">EcoNexus Nashik</span>
-            <span>• Academic PBL Civic Technology Platform</span>
+            <span>• Municipal Civic Waste Management Platform</span>
           </div>
           <div>
-            Built with C++17 DSA Algorithms, React 18, Node.js, and SQLite Prisma.
+            Solid Waste Management Department • Nashik Municipal Corporation
           </div>
         </div>
       </footer>

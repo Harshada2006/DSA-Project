@@ -5,17 +5,14 @@ import {
   Trash2,
   MapPin,
   ListOrdered,
-  Route,
   Users,
   CheckSquare,
   AlertCircle,
   BatteryCharging,
   Building2,
-  CalendarDays,
   BarChart3,
-  Database,
   Leaf,
-  Cpu,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, onClose }) => {
@@ -23,16 +20,14 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { label: 'Overview', to: '/organization/overview', icon: LayoutDashboard },
     { label: 'Bin Management', to: '/organization/bins', icon: Trash2 },
     { label: 'Geospatial Live Map', to: '/organization/map', icon: MapPin },
-    { label: 'Route Planning', to: '/organization/route-optimization', icon: Route, badge: 'Dijkstra' },
-    { label: 'Priority Queue', to: '/organization/prioritized-tasks', icon: ListOrdered, badge: 'C++ Heap' },
+    { label: 'Collection Priority', to: '/organization/prioritized-tasks', icon: ListOrdered },
     { label: 'Collection Tasks', to: '/organization/tasks', icon: CheckSquare },
     { label: 'Worker Team', to: '/organization/workers', icon: Users },
     { label: 'Citizen Complaints', to: '/organization/complaints', icon: AlertCircle },
     { label: 'E-Waste Stewardship', to: '/organization/ewaste', icon: BatteryCharging },
     { label: 'Verified Facilities', to: '/organization/facilities', icon: Building2 },
-    { label: 'Schedules & Festivals', to: '/organization/schedules', icon: CalendarDays },
+    { label: 'Roadblocks & Issues', to: '/organization/issues', icon: AlertTriangle },
     { label: 'Analytics & Reports', to: '/organization/analytics', icon: BarChart3 },
-    { label: 'Data Provenance', to: '/organization/data-sources', icon: Database },
   ];
 
   return (
@@ -92,11 +87,6 @@ export const Sidebar = ({ isOpen, onClose }) => {
                   <Icon className="w-4 h-4 shrink-0 text-slate-400 group-hover:text-white" />
                   <span>{item.label}</span>
                 </div>
-                {item.badge && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-sm bg-slate-800 text-emerald-300 border border-slate-700">
-                    {item.badge}
-                  </span>
-                )}
               </NavLink>
             );
           })}
@@ -106,7 +96,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 text-xs text-slate-400">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold text-slate-200">C++ DSA Engine Online</span>
+            <span className="font-semibold text-slate-200">System Status: Operational</span>
           </div>
           <p className="text-xs text-slate-400">Nashik Municipal SWM • v2.1</p>
         </div>

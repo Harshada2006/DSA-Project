@@ -3,26 +3,32 @@ import { logAuditEvent } from '../middleware/auth.js';
 
 export class EWasteService {
   /**
-   * Submit citizen e-waste pickup request
+   * Submit citizen e-waste pickup request.
+   * Simple form with non-essential fields optional.
    */
   async submitPickupRequest(citizenUser, data, req) {
     const {
-      citizenName,
-      citizenEmail,
-      contactPhone,
+      category,
+      approximateQuantity,
       pickupAddress,
-      wardId,
+      preferredPickupDate,
+      preferredTimeSlot,
+      description,
+      itemsDescription,
+      photoUrl,
+      contactPhone,
       latitude,
       longitude,
-      itemsDescription,
-      approximateQuantity,
-      estimatedWeightKg,
-      preferredPickupDate,
     } = data;
 
-    if (!itemsDescription || !pickupAddress || !contactPhone) {
-      throw new Error('Items description, pickup address, and contact phone are required for e-waste pickup.');
+    const effectiveDesc = description?.trim() || itemsDescription?.trim() || `${category || 'Electronic waste'} pickup`;
+    const effectiveAddress = pickupAddress?.trim();
+
+    if (!effectiveAddress) {
+      throw new Error('Pickup address is required to arrange doorstep e-waste collection.');
     }
+
+    const phone = contactPhone?.trim() || citizenUser?.workerProfile?.phone || citizenUser?.phone || 'Not provided';
 
     const count = await prisma.eWasteRequest.count();
     const ticketNo = `EW-2026-${String(count + 101).padStart(4, '0')}`;
@@ -31,18 +37,16 @@ export class EWasteService {
       data: {
         ticketNo,
         citizenId: citizenUser?.id || null,
-        citizenName: citizenName || citizenUser?.name || 'Nashik Resident',
-        citizenEmail: citizenEmail || citizenUser?.email || '',
-        contactPhone: contactPhone.trim(),
-        pickupAddress: pickupAddress.trim(),
-        wardId: wardId || null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        itemsDescription: itemsDescription.trim(),
+        citizenName: citizenUser?.name || 'Nashik Resident',
+        citizenEmail: citizenUser?.email || '',
+        contactPhone: phone,
+        pickupAddress: effectiveAddress,
+        itemsDescription: effectiveDesc,
         approximateQuantity: approximateQuantity || 'Standard electronics batch',
-        estimatedWeightKg: estimatedWeightKg ? parseFloat(estimatedWeightKg) : null,
         preferredPickupDate: preferredPickupDate ? new Date(preferredPickupDate) : null,
         status: 'submitted',
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
       },
     });
 
@@ -51,7 +55,7 @@ export class EWasteService {
       action: 'EWASTE_REQUEST_SUBMITTED',
       resource: 'EWasteRequest',
       resourceId: request.id,
-      details: { ticketNo, itemsDescription },
+      details: { ticketNo, effectiveDesc },
       req,
     });
 
@@ -67,7 +71,11 @@ export class EWasteService {
     if (user.role === 'CITIZEN') {
       where.citizenId = user.id;
     } else if (user.role === 'WORKER') {
-      where.assignedWorkerId = user.id;
+      // Worker sees assigned or open collectable requests
+      where.OR = [
+        { assignedWorkerId: user.id },
+        { status: 'assigned' },
+      ];
     }
 
     if (filters.status) where.status = filters.status;
@@ -125,19 +133,20 @@ export class EWasteService {
     const request = await prisma.eWasteRequest.findUnique({ where: { id: requestId } });
     if (!request) throw new Error('E-waste request not found.');
 
-    if (workerUser.role === 'WORKER' && request.assignedWorkerId !== workerUser.id) {
+    if (workerUser.role === 'WORKER' && request.assignedWorkerId && request.assignedWorkerId !== workerUser.id) {
       throw new Error('Access denied: You can only update e-waste tasks assigned to you.');
     }
 
-    const { measuredWeightKg, resolutionNotes, status = 'collected' } = collectionData;
+    const { measuredWeightKg, resolutionNotes } = collectionData;
 
     const updated = await prisma.eWasteRequest.update({
       where: { id: requestId },
       data: {
-        status,
+        status: 'collected',
         collectionDate: new Date(),
+        assignedWorkerId: workerUser.id,
         estimatedWeightKg: measuredWeightKg ? parseFloat(measuredWeightKg) : request.estimatedWeightKg,
-        resolutionNotes: resolutionNotes || `Collected by ${workerUser.name}`,
+        resolutionNotes: resolutionNotes || `Collected by ${workerUser.name}. Ready for recycler handover.`,
       },
     });
 
@@ -146,7 +155,7 @@ export class EWasteService {
       action: 'EWASTE_COLLECTION_RECORDED',
       resource: 'EWasteRequest',
       resourceId: requestId,
-      details: { measuredWeightKg, status },
+      details: { measuredWeightKg, status: 'collected' },
       req,
     });
 
@@ -154,7 +163,7 @@ export class EWasteService {
   }
 
   /**
-   * Record handover to verified recycler facility (Worker or Admin)
+   * Record handover to destination facility (Worker or Admin)
    */
   async recordFacilityHandover(handoverData, user, req) {
     const {
@@ -166,14 +175,15 @@ export class EWasteService {
     } = handoverData;
 
     if (!facilityId || !measuredWeightKg) {
-      throw new Error('Authorized destination facility and measured weight (kg) are required.');
+      throw new Error('Destination facility and measured weight (kg) are required.');
     }
 
     const facility = await prisma.facility.findUnique({ where: { id: facilityId } });
-    if (!facility) throw new Error('Target destination facility not found.');
+    if (!facility) throw new Error('Destination facility not found.');
 
-    if (facility.verificationStatus !== 'verified') {
-      throw new Error('Waste cannot be transferred to an unverified or pending facility.');
+    // Validate that facility is eligible for e-waste
+    if (facility.facilityType === 'scrap_dealer') {
+      throw new Error('General scrap dealers cannot be selected as authorized e-waste destinations.');
     }
 
     const handover = await prisma.handoverRecord.create({
@@ -191,14 +201,14 @@ export class EWasteService {
       include: { facility: true },
     });
 
-    // Update e-waste request status if applicable
+    // Update e-waste request status to completed / delivered
     if (ewasteRequestId) {
       await prisma.eWasteRequest.update({
         where: { id: ewasteRequestId },
         data: {
           status: 'delivered_to_recycler',
           assignedFacilityId: facilityId,
-          resolutionNotes: `Delivered and verified at ${facility.name}. Receipt: ${receiptNumber || 'N/A'}`,
+          resolutionNotes: `Delivered to ${facility.name}. Receipt: ${receiptNumber || 'Confirmed by crew'}.`,
         },
       });
     }

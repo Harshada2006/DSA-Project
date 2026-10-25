@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { datasetService } from '../services/datasetService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,8 @@ async function main() {
   console.log('🌱 Starting EcoNexus Nashik database seeding...');
 
   // 1. Clean existing records in correct foreign key order
+  await prisma.operationalIssue.deleteMany();
+  await prisma.sampleWorkerRecord.deleteMany();
   await prisma.handoverRecord.deleteMany();
   await prisma.eWasteRequest.deleteMany();
   await prisma.facility.deleteMany();
@@ -130,6 +133,7 @@ async function main() {
       password: citizenPassword,
       role: 'CITIZEN',
       status: 'active',
+      isEmailVerified: true,
     },
   });
 
@@ -748,6 +752,18 @@ async function main() {
     ],
   });
   console.log('✓ Seeded data sources with provenance');
+
+  console.log('🌱 Seeding Nashik E-Waste Facilities (Section 18)...');
+  await datasetService.seedNashikEWasteFacilities();
+  console.log('✓ Seeded Nashik E-Waste Facilities');
+
+  console.log('🌱 Importing sample fictional worker records from Excel...');
+  await datasetService.importSampleWorkersFromExcel();
+  console.log('✓ Imported sample fictional worker records');
+
+  console.log('🌱 Training initial Ridge ML model from 180-day bin timeseries...');
+  await datasetService.trainAndPersistModel();
+  console.log('✓ Trained and persisted ML model');
 
   console.log('\n======================================================');
   console.log('  ECONEXUS SEED COMPLETED SUCCESSFULLY');

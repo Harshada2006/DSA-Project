@@ -4,6 +4,7 @@ import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { Modal } from '../components/common/Modal.jsx';
+import { SearchInput } from '../components/common/SearchInput.jsx';
 import {
   Users,
   Plus,
@@ -14,14 +15,17 @@ import {
   Copy,
   ShieldCheck,
   MapPin,
+  AlertCircle,
 } from 'lucide-react';
 
 export const WorkersPage = () => {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [isProvisionOpen, setIsProvisionOpen] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [generatedToken, setGeneratedToken] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const [form, setForm] = useState({
     name: 'Ganesh Shinde',
@@ -31,6 +35,11 @@ export const WorkersPage = () => {
     phone: '+91 98231 09876',
   });
 
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const loadWorkers = async () => {
     setLoading(true);
     try {
@@ -38,6 +47,7 @@ export const WorkersPage = () => {
       setWorkers(data || []);
     } catch (err) {
       console.error('Failed to load workers:', err);
+      showToast('error', `Failed to load workforce: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -60,9 +70,10 @@ export const WorkersPage = () => {
         vehicleNumber: '',
         phone: '',
       });
+      showToast('success', `Worker ${res.workerId} provisioned with activation token!`);
       loadWorkers();
     } catch (err) {
-      alert(`Provision error: ${err.message}`);
+      showToast('error', `Provision error: ${err.message}`);
     } finally {
       setProvisioning(false);
     }
@@ -70,11 +81,32 @@ export const WorkersPage = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert('Activation token copied to clipboard!');
+    showToast('success', 'Activation token copied to clipboard!');
   };
+
+  const filteredWorkers = workers.filter((w) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (w.user?.name || '').toLowerCase().includes(q) ||
+      (w.workerId || '').toLowerCase().includes(q) ||
+      (w.vehicleNumber || '').toLowerCase().includes(q) ||
+      (w.user?.email || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
+      {/* Toast Feedback */}
+      {toast && (
+        <div className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border text-xs font-semibold ${
+          toast.type === 'success' ? 'bg-slate-900 text-emerald-400 border-emerald-500/50' : 'bg-rose-900 text-white border-rose-500'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -89,18 +121,35 @@ export const WorkersPage = () => {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            setGeneratedToken(null);
-            setIsProvisionOpen(true);
-          }}
-          icon={<Plus className="w-3.5 h-3.5" />}
-        >
-          Provision New Worker
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadWorkers} icon={<RefreshCw className="w-3.5 h-3.5" />}>
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setGeneratedToken(null);
+              setIsProvisionOpen(true);
+            }}
+            icon={<Plus className="w-3.5 h-3.5" />}
+          >
+            Provision New Worker
+          </Button>
+        </div>
       </div>
+
+      {/* Search Input Bar */}
+      <Card className="p-4">
+        <div className="max-w-md">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            onClear={() => setSearch('')}
+            placeholder="Search workers by name, Worker ID, vehicle, or email..."
+          />
+        </div>
+      </Card>
 
       {/* Workers Roster Table */}
       <Card className="overflow-hidden">
@@ -124,16 +173,16 @@ export const WorkersPage = () => {
                     Loading field workforce...
                   </td>
                 </tr>
-              ) : workers.length === 0 ? (
+              ) : filteredWorkers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center p-8 text-slate-500">
-                    No field workers provisioned yet.
+                    No field workers match your search criteria.
                   </td>
                 </tr>
               ) : (
-                workers.map((w) => (
+                filteredWorkers.map((w) => (
                   <tr key={w.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-3.5 font-bold text-slate-900">
+                    <td className="p-3.5 font-bold text-slate-900 text-xs">
                       {w.user?.name || 'Staff Member'}
                     </td>
                     <td className="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50">
@@ -183,7 +232,7 @@ export const WorkersPage = () => {
                 Worker Account Provisioned!
               </div>
               <p className="text-slate-700">
-                Provide the following credentials to the driver or sanitary worker to activate their account in the Field Operations Portal:
+                Provide these details to the worker so they can activate their account on the Worker Sign In page:
               </p>
               <div className="mt-3 p-3 bg-white rounded-lg border border-emerald-200 font-mono text-slate-900 space-y-1">
                 <div><strong>Worker ID:</strong> {generatedToken.workerId}</div>
@@ -192,7 +241,7 @@ export const WorkersPage = () => {
                   <div><strong>Activation Token:</strong> <span className="text-emerald-700 font-bold">{generatedToken.activationToken}</span></div>
                   <button
                     onClick={() => copyToClipboard(generatedToken.activationToken)}
-                    className="p-1 hover:bg-slate-100 rounded text-slate-600"
+                    className="p-1 hover:bg-slate-100 rounded text-slate-600 cursor-pointer"
                     title="Copy Token"
                   >
                     <Copy className="w-4 h-4" />
@@ -201,69 +250,81 @@ export const WorkersPage = () => {
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <Button variant="primary" size="sm" onClick={() => setIsProvisionOpen(false)}>
-                Done
-              </Button>
-            </div>
+            <Button variant="primary" size="sm" onClick={() => setIsProvisionOpen(false)} className="w-full">
+              Done
+            </Button>
           </div>
         ) : (
-          <form onSubmit={handleProvision} className="space-y-3 text-xs">
+          <form onSubmit={handleProvision} className="space-y-4 text-xs">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Worker Full Name *</label>
+              <label className="block text-slate-700 font-semibold mb-1">Full Legal Name *</label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Ramesh Kadam"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Official Municipal Email *</label>
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="ramesh.k@econexus.gov.in"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Worker ID</label>
+                <label className="block text-slate-700 font-semibold mb-1">Official Work Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Worker Badge ID *</label>
                 <input
                   type="text"
                   required
                   value={form.workerId}
                   onChange={(e) => setForm({ ...form, workerId: e.target.value })}
-                  placeholder="WRK-NSK-105"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Vehicle License Plate</label>
-                <input
-                  type="text"
-                  value={form.vehicleNumber}
-                  onChange={(e) => setForm({ ...form, vehicleNumber: e.target.value })}
-                  placeholder="MH-15-EG-4401"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
                 />
               </div>
             </div>
 
-            <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsProvisionOpen(false)}>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Assigned Vehicle Number</label>
+                <input
+                  type="text"
+                  value={form.vehicleNumber}
+                  onChange={(e) => setForm({ ...form, vehicleNumber: e.target.value })}
+                  placeholder="e.g. MH-15-EG-4401"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Contact Phone</label>
+                <input
+                  type="text"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="+91 98XXX XXXXX"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
+              <strong>Account Security:</strong> Workers cannot register themselves publicly. After you provision this worker, an expiring single-use activation token is created for them to set their password.
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => setIsProvisionOpen(false)} type="button">
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="sm" isLoading={provisioning}>
-                Generate Token & Provision
+              <Button variant="primary" size="sm" type="submit" isLoading={provisioning}>
+                Generate Invitation Token
               </Button>
             </div>
           </form>

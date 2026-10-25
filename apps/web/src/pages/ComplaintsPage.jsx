@@ -4,6 +4,7 @@ import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { Modal } from '../components/common/Modal.jsx';
+import { SearchInput } from '../components/common/SearchInput.jsx';
 import {
   MessageSquare,
   AlertTriangle,
@@ -11,7 +12,6 @@ import {
   Clock,
   Filter,
   RefreshCw,
-  Search,
   Eye,
   UserCheck,
 } from 'lucide-react';
@@ -44,7 +44,6 @@ export const ComplaintsPage = () => {
         api.getComplaints({
           status: statusFilter || undefined,
           wardId: wardFilter || undefined,
-          search: search || undefined,
         }),
         api.getWards(),
         api.getWorkers().catch(() => []),
@@ -81,11 +80,23 @@ export const ComplaintsPage = () => {
 
   const getStatusBadge = (status) => {
     const s = (status || '').toUpperCase();
-    if (s === 'RESOLVED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">Resolved</span>;
-    if (s === 'IN_PROGRESS' || s === 'ASSIGNED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-800 border border-blue-300">{s}</span>;
-    if (s === 'REJECTED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">Rejected</span>;
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">{s}</span>;
+    if (s === 'RESOLVED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">Resolved</span>;
+    if (s === 'IN_PROGRESS' || s === 'ASSIGNED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-blue-100 text-blue-800 border border-blue-300">{s}</span>;
+    if (s === 'REJECTED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">Rejected</span>;
+    return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">{s}</span>;
   };
+
+  const filteredComplaints = complaints.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (c.ticketNumber || '').toLowerCase().includes(q) ||
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q) ||
+      (c.ward?.name || '').toLowerCase().includes(q) ||
+      (c.landmark || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -93,12 +104,12 @@ export const ComplaintsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Citizen Grievances & Grievance Redressal</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Citizen Grievances & Redressal</h1>
             <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200">
               {complaints.length} Filed
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             Track, assign, and resolve municipal sanitation complaints reported by Nashik residents
           </p>
         </div>
@@ -108,52 +119,47 @@ export const ComplaintsPage = () => {
         </Button>
       </div>
 
-      {/* Filters Bar */}
-      <Card className="p-4 flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[220px]">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by ticket # or summary..."
-            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm"
-          />
-        </div>
+      {/* Filters Bar with SearchInput */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onClear={() => setSearch('')}
+              placeholder="Search by ticket #, summary, or landmark..."
+            />
+          </div>
 
-        <div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-          >
-            <option value="">All Statuses</option>
-            <option value="submitted">Submitted</option>
-            <option value="under_review">Under Review</option>
-            <option value="assigned">Assigned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="">All Statuses</option>
+              <option value="submitted">Submitted</option>
+              <option value="under_review">Under Review</option>
+              <option value="assigned">Assigned</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="rejected">Rejected</option>
+            </select>
 
-        <div>
-          <select
-            value={wardFilter}
-            onChange={(e) => setWardFilter(e.target.value)}
-            className="px-3.5 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-          >
-            <option value="">All Wards</option>
-            {wards.map((w) => (
-              <option key={w.id} value={w.id}>
-                Ward {w.number}: {w.name}
-              </option>
-            ))}
-          </select>
+            <select
+              value={wardFilter}
+              onChange={(e) => setWardFilter(e.target.value)}
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="">All Wards</option>
+              {wards.map((w) => (
+                <option key={w.id} value={w.id}>
+                  Ward {w.number}: {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-
-        <Button variant="primary" size="md" onClick={loadComplaints}>
-          Apply
-        </Button>
       </Card>
 
       {/* Complaints Table */}
@@ -164,8 +170,8 @@ export const ComplaintsPage = () => {
               <tr>
                 <th className="p-3.5">Ticket #</th>
                 <th className="p-3.5">Summary</th>
-                <th className="p-3.5">Ward & Location</th>
-                <th className="p-3.5">Category & Severity</th>
+                <th className="p-3.5">Ward & Landmark</th>
+                <th className="p-3.5">Category</th>
                 <th className="p-3.5">Status</th>
                 <th className="p-3.5">Filed On</th>
                 <th className="p-3.5 text-right">Action</th>
@@ -179,37 +185,35 @@ export const ComplaintsPage = () => {
                     Loading citizen grievances...
                   </td>
                 </tr>
-              ) : complaints.length === 0 ? (
+              ) : filteredComplaints.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center p-8 text-slate-500">
                     No complaints matching current filters.
                   </td>
                 </tr>
               ) : (
-                complaints.map((c) => (
+                filteredComplaints.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-3.5 font-mono font-bold text-slate-900 text-sm">
+                    <td className="p-3.5 font-mono font-bold text-slate-900 text-xs">
                       {c.ticketNumber || `CMP-${c.id.slice(0, 8)}`}
                     </td>
-                    <td className="p-3.5">
-                      <div className="font-semibold text-slate-900 text-sm">{c.title}</div>
-                      <div className="text-slate-500 text-xs truncate max-w-xs">{c.description}</div>
+                    <td className="p-3.5 max-w-xs">
+                      <div className="font-semibold text-slate-900 text-xs truncate" title={c.title}>{c.title}</div>
+                      <div className="text-slate-500 text-[11px] truncate max-w-xs">{c.description || 'No additional notes'}</div>
                     </td>
                     <td className="p-3.5">
-                      <div className="font-medium text-slate-800 text-sm">{c.ward?.name || 'Nashik Ward'}</div>
-                      <div className="text-slate-500 text-xs">{c.landmark || '—'}</div>
+                      <div className="font-medium text-slate-800 text-xs">{c.ward?.name || 'Nashik Ward'}</div>
+                      <div className="text-slate-500 text-[11px] truncate max-w-xs">{c.landmark || '—'}</div>
                     </td>
                     <td className="p-3.5">
-                      <div className="font-medium text-slate-800 text-sm">{c.category}</div>
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                        c.severity === 'CRITICAL' ? 'text-rose-700 bg-rose-50' :
-                        c.severity === 'HIGH' ? 'text-amber-700 bg-amber-50' : 'text-slate-600'
-                      }`}>
-                        {c.severity}
+                      <span className="text-xs font-medium text-slate-700 capitalize">
+                        {c.category?.toLowerCase().replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="p-3.5">{getStatusBadge(c.status)}</td>
-                    <td className="p-3.5 text-slate-500 text-xs">
+                    <td className="p-3.5">
+                      {getStatusBadge(c.status)}
+                    </td>
+                    <td className="p-3.5 text-slate-500 text-xs whitespace-nowrap">
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-3.5 text-right">
@@ -219,14 +223,15 @@ export const ComplaintsPage = () => {
                         onClick={() => {
                           setSelectedComplaint(c);
                           setStatusForm({
-                            status: c.status || 'IN_PROGRESS',
+                            status: c.status === 'submitted' ? 'IN_PROGRESS' : c.status,
                             assignedWorkerId: c.assignedWorkerId || '',
                             resolutionNotes: c.resolutionNotes || '',
                             internalNotes: c.internalNotes || '',
                           });
                         }}
+                        icon={<Eye className="w-3.5 h-3.5" />}
                       >
-                        Review & Update
+                        Review
                       </Button>
                     </td>
                   </tr>
@@ -237,89 +242,93 @@ export const ComplaintsPage = () => {
         </div>
       </Card>
 
-      {/* Review Modal */}
-      <Modal
-        isOpen={!!selectedComplaint}
-        onClose={() => setSelectedComplaint(null)}
-        title={`Review Grievance #${selectedComplaint?.ticketNumber || ''}`}
-      >
-        <form onSubmit={handleUpdateStatus} className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <h4 className="font-bold text-slate-900 mb-1">{selectedComplaint?.title}</h4>
-            <p className="text-slate-600">{selectedComplaint?.description}</p>
-            <div className="mt-2 text-[11px] text-slate-500 flex gap-4">
-              <span><strong>Ward:</strong> {selectedComplaint?.ward?.name}</span>
-              <span><strong>Landmark:</strong> {selectedComplaint?.landmark || 'None'}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Update Status *</label>
-              <select
-                required
-                value={statusForm.status}
-                onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-              >
-                <option value="SUBMITTED">Submitted</option>
-                <option value="UNDER_REVIEW">Under Review</option>
-                <option value="ASSIGNED">Assigned</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="RESOLVED">Resolved</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
+      {/* Complaint Review Modal */}
+      {selectedComplaint && (
+        <Modal
+          isOpen={!!selectedComplaint}
+          onClose={() => setSelectedComplaint(null)}
+          title={`Grievance Review: #${selectedComplaint.ticketNumber || selectedComplaint.id.slice(0, 8)}`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="font-semibold text-slate-600">Issue:</span>
+                <strong className="text-slate-900">{selectedComplaint.title}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold text-slate-600">Ward:</span>
+                <span className="text-slate-800">{selectedComplaint.ward?.name || 'Nashik'}</span>
+              </div>
+              {selectedComplaint.landmark && (
+                <div className="flex justify-between">
+                  <span className="font-semibold text-slate-600">Landmark:</span>
+                  <span className="text-slate-800">{selectedComplaint.landmark}</span>
+                </div>
+              )}
+              {selectedComplaint.description && (
+                <div className="pt-1 border-t border-slate-200">
+                  <span className="font-semibold text-slate-600 block mb-0.5">Details:</span>
+                  <p className="text-slate-700">{selectedComplaint.description}</p>
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Assign Field Worker</label>
-              <select
-                value={statusForm.assignedWorkerId}
-                onChange={(e) => setStatusForm({ ...statusForm, assignedWorkerId: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-              >
-                <option value="">Leave Unassigned</option>
-                {workers.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.user?.name} ({w.workerId})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+            <form onSubmit={handleUpdateStatus} className="space-y-3">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Status Transition</label>
+                <select
+                  value={statusForm.status}
+                  onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+                >
+                  <option value="SUBMITTED">Submitted (Pending Review)</option>
+                  <option value="UNDER_REVIEW">Under Review</option>
+                  <option value="ASSIGNED">Assigned to Field Crew</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="RESOLVED">Resolved / Cleared</option>
+                  <option value="REJECTED">Rejected / Invalid</option>
+                </select>
+              </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Public Resolution Note (Visible to Citizen)</label>
-            <textarea
-              rows={2}
-              value={statusForm.resolutionNotes}
-              onChange={(e) => setStatusForm({ ...statusForm, resolutionNotes: e.target.value })}
-              placeholder="e.g. Sanitary inspector dispatched compactor truck MH-15-EG-4401 and cleared the overflow at 11:30 AM."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg resize-none"
-            />
-          </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Assign Sanitary Driver / Worker</label>
+                <select
+                  value={statusForm.assignedWorkerId}
+                  onChange={(e) => setStatusForm({ ...statusForm, assignedWorkerId: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+                >
+                  <option value="">Select Field Staff (Optional)</option>
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.user?.name || w.workerId} ({w.workerId} • {w.vehicleNumber || 'Van'})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Internal Staff Note (Confidential)</label>
-            <input
-              type="text"
-              value={statusForm.internalNotes}
-              onChange={(e) => setStatusForm({ ...statusForm, internalNotes: e.target.value })}
-              placeholder="e.g. Regular recurrence spot near fruit vendor stands; flagged for additional bin placement."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-            />
-          </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Citizen Resolution Feedback Note</label>
+                <textarea
+                  rows={2}
+                  value={statusForm.resolutionNotes}
+                  onChange={(e) => setStatusForm({ ...statusForm, resolutionNotes: e.target.value })}
+                  placeholder="Note visible to the citizen upon resolution..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs resize-none"
+                />
+              </div>
 
-          <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setSelectedComplaint(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={updating}>
-              Save Redressal Update
-            </Button>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button variant="outline" size="sm" onClick={() => setSelectedComplaint(null)} type="button">
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" isLoading={updating}>
+                  Save Resolution
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 };

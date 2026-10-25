@@ -29,6 +29,30 @@ export const api = {
   getCppHealth: () => fetchJson('/dsa/health'),
 
   // Authentication & Stakeholders
+  citizenRegister: (data) =>
+    fetchJson('/auth/citizen/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  verifyCitizenEmail: (email, code) =>
+    fetchJson('/auth/citizen/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
+
+  resendCitizenCode: (email) =>
+    fetchJson('/auth/citizen/resend-code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  citizenLogin: (email, password) =>
+    fetchJson('/auth/citizen/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
   requestCitizenOtp: (email, name) =>
     fetchJson('/auth/citizen/otp', {
       method: 'POST',
@@ -41,16 +65,28 @@ export const api = {
       body: JSON.stringify({ email, otpCode, name }),
     }),
 
-  workerLogin: (workerId, orgCode, password) =>
-    fetchJson('/auth/worker/login', {
+  requestPasswordReset: (email) =>
+    fetchJson('/auth/password/reset-request', {
       method: 'POST',
-      body: JSON.stringify({ workerId, orgCode, password }),
+      body: JSON.stringify({ email }),
     }),
 
-  activateWorker: (workerId, activationToken, newPassword) =>
+  resetPassword: (data) =>
+    fetchJson('/auth/password/reset-confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  workerLogin: (workerIdOrEmail, password) =>
+    fetchJson('/auth/worker/login', {
+      method: 'POST',
+      body: JSON.stringify({ workerId: workerIdOrEmail, email: workerIdOrEmail, password }),
+    }),
+
+  activateWorker: (data) =>
     fetchJson('/auth/worker/activate', {
       method: 'POST',
-      body: JSON.stringify({ workerId, activationToken, newPassword }),
+      body: JSON.stringify(data),
     }),
 
   orgRegister: (data) =>
@@ -63,6 +99,34 @@ export const api = {
     fetchJson('/auth/organization/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+
+  // Operational Issues & Roadblocks
+  reportIssue: (data) =>
+    fetchJson('/issues', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getIssues: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set('status', params.status);
+    if (params.issueType) q.set('issueType', params.issueType);
+    return fetchJson(`/issues?${q.toString()}`);
+  },
+
+  getActiveRoadblocks: () => fetchJson('/issues/roadblocks'),
+
+  toggleRoadblock: (data) =>
+    fetchJson('/issues/roadblocks/toggle', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateIssueStatus: (id, data) =>
+    fetchJson(`/issues/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 
   getMe: () => fetchJson('/auth/me'),

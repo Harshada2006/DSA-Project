@@ -66,14 +66,14 @@ export const Header = ({ onMenuClick }) => {
           <span>Swachh Nashik</span>
         </div>
 
-        {/* C++ DSA Status Pill */}
+        {/* Optimization Engine Status Pill */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700">
-          <Cpu className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="hidden sm:inline">C++17 Engine:</span>
+          <Activity className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="hidden sm:inline">Engine:</span>
           {cppStatus === 'healthy' ? (
             <span className="text-emerald-700 font-semibold flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Connected
+              Active
             </span>
           ) : cppStatus === 'checking' ? (
             <span className="text-amber-600 font-semibold">Checking...</span>

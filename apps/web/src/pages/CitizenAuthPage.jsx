@@ -2,57 +2,239 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api/client.js';
-import { Mail, KeyRound, User, ArrowRight, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft,
+  KeyRound,
+  Info,
+} from 'lucide-react';
 
 export const CitizenAuthPage = () => {
-  const [email, setEmail] = useState('citizen@econexus.gov.in');
-  const [name, setName] = useState('Ananya Deshmukh');
-  const [otpCode, setOtpCode] = useState('');
-  const [step, setStep] = useState(1); // 1: Email, 2: OTP
-  const [loading, setLoading] = useState(false);
+  // Modes: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
+  const [mode, setMode] = useState('login');
+
+  // Login state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Signup state
+  const [fullName, setFullName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
+
+  // Verification state
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [devOtp, setDevOtp] = useState('');
+
+  // Password Reset state
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+
+  // Feedback states
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSendOtp = async (e) => {
+  const clearMessages = () => {
+    setError('');
+    setSuccessMsg('');
+  };
+
+  // 1. Citizen Password Login
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!email) {
-      setError('Please provide your email address.');
+    clearMessages();
+
+    if (!loginEmail || !loginPassword) {
+      setError('Please provide your registered email address and password.');
       return;
     }
-    setError('');
+
     setLoading(true);
     try {
-      const res = await api.requestCitizenOtp(email, name);
-      setInfo(res.message || 'Verification code sent to your email.');
-      if (res.devOtpCode) {
-        setDevOtp(res.devOtpCode);
-      }
-      setStep(2);
+      const res = await api.citizenLogin(loginEmail, loginPassword);
+      login(res.token, res.user);
+      navigate('/citizen/dashboard');
     } catch (err) {
-      setError(err.message || 'Failed to send OTP code.');
+      const msg = err.message || 'Login failed. Please verify your credentials.';
+      setError(msg);
+      // If error indicates unverified email, offer immediate verification step
+      if (msg.toLowerCase().includes('not been verified')) {
+        setVerifyEmail(loginEmail);
+        setTimeout(() => {
+          setMode('verify');
+        }, 1200);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e) => {
+  // 2. Citizen Registration
+  const handleSignup = async (e) => {
     e.preventDefault();
-    if (!otpCode || otpCode.length < 6) {
+    clearMessages();
+
+    if (!fullName.trim()) {
+      setError('Full name is required.');
+      return;
+    }
+    if (!signupEmail || !signupEmail.includes('@')) {
+      setError('Please provide a valid email address.');
+      return;
+    }
+    if (signupPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (signupPassword !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter.');
+      return;
+    }
+    if (!agreeTerms) {
+      setError('Please agree to the municipal civic terms to proceed.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.citizenRegister({
+        name: fullName.trim(),
+        email: signupEmail.trim(),
+        password: signupPassword,
+        confirmPassword,
+        agreeTerms,
+      });
+
+      setSuccessMsg(res.message || 'Account created! Enter the verification code below to verify your email.');
+      setVerifyEmail(signupEmail.trim());
+      if (res.devOtpCode) {
+        setDevOtp(res.devOtpCode);
+      }
+      setMode('verify');
+    } catch (err) {
+      setError(err.message || 'Registration failed. Email may already be in use.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Email Verification
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!verifyEmail || !verificationCode || verificationCode.length < 6) {
       setError('Please enter the 6-digit verification code.');
       return;
     }
-    setError('');
+
     setLoading(true);
     try {
-      const res = await api.verifyCitizenOtp(email, otpCode, name);
-      login(res.token, res.user);
-      navigate('/citizen/dashboard');
+      const res = await api.verifyCitizenEmail(verifyEmail, verificationCode);
+      setSuccessMsg(res.message || 'Email successfully verified! You may now sign in.');
+      setLoginEmail(verifyEmail);
+      setMode('login');
     } catch (err) {
-      setError(err.message || 'Invalid or expired OTP code.');
+      setError(err.message || 'Invalid or expired verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend Verification Code
+  const handleResendCode = async () => {
+    clearMessages();
+    if (!verifyEmail) {
+      setError('Please provide your registered email address.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.resendCitizenCode(verifyEmail);
+      setSuccessMsg('A new verification code has been dispatched.');
+      if (res.devOtpCode) setDevOtp(res.devOtpCode);
+    } catch (err) {
+      setError(err.message || 'Failed to resend code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Request Password Reset
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!resetEmail || !resetEmail.includes('@')) {
+      setError('Please provide your registered email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.requestPasswordReset(resetEmail);
+      setSuccessMsg(res.message || 'Password reset code generated.');
+      if (res.devOtpCode) setDevOtp(res.devOtpCode);
+      setMode('reset');
+    } catch (err) {
+      setError(err.message || 'Failed to process password reset request.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 5. Confirm Password Reset
+  const handleResetConfirm = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!resetEmail || !resetCode) {
+      setError('Email and reset code are required.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.resetPassword({
+        email: resetEmail.trim(),
+        code: resetCode.trim(),
+        newPassword,
+        confirmPassword: confirmNewPassword,
+      });
+
+      setSuccessMsg(res.message || 'Password successfully updated! Please sign in with your new password.');
+      setLoginEmail(resetEmail);
+      setMode('login');
+    } catch (err) {
+      setError(err.message || 'Password reset failed. Invalid or expired code.');
     } finally {
       setLoading(false);
     }
@@ -60,9 +242,20 @@ export const CitizenAuthPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background glow effects */}
+      {/* Background ambient accents */}
       <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Navigation back to landing */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 transition-colors shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to EcoNexus Home</span>
+        </Link>
+      </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex justify-center mb-3">
@@ -72,160 +265,481 @@ export const CitizenAuthPage = () => {
             </div>
           </div>
         </div>
-        <h2 className="text-center text-2xl font-bold tracking-tight text-white">
-          Citizen Portal
-        </h2>
+        <h1 className="text-center text-2xl font-bold tracking-tight text-white">
+          Citizen Civic Portal
+        </h1>
         <p className="mt-1 text-center text-xs text-slate-400">
-          Smart Civic Waste Grievance & E-Waste Booking for Nashik
+          Nashik Municipal Corporation • Smart Waste & E-Waste Services
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/60 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+        <div className="bg-slate-800/85 backdrop-blur-xl border border-slate-700/60 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+          {/* Error Notice */}
           {error && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300">
-              {error}
+            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
-          {info && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{info}</span>
+          {/* Success Notice */}
+          {successMsg && (
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>{successMsg}</span>
             </div>
           )}
 
-          {step === 1 ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Full Name</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
+          {/* Development Mode Notice */}
+          {devOtp && (
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-300 mb-0.5">
+                <Info className="w-3.5 h-3.5" />
+                <span>Development Mode (Email Delivery Simulation)</span>
+              </div>
+              <p className="text-[11px] text-amber-200/90">
+                Email delivery is not configured with a live SMTP server. Your verification code is:{' '}
+                <strong className="font-mono text-white text-sm bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
+                  {devOtp}
+                </strong>
+              </p>
+            </div>
+          )}
+
+          {/* MODE 1: CITIZEN SIGN IN */}
+          {mode === 'login' && (
+            <div>
+              <div className="mb-5 text-center">
+                <h2 className="text-lg font-bold text-white">Sign In with Password</h2>
+                <p className="text-xs text-slate-400 mt-1">Enter your registered citizen credentials</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Email Address</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-4 w-4 text-slate-500" />
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Email Address</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
                   </div>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Passwordless login via secure one-time passcode (OTP).
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-300">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearMessages();
+                        setResetEmail(loginEmail);
+                        setMode('forgot');
+                      }}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="block w-full pl-10 pr-10 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Signing In...' : 'Sign In'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
+                <p className="text-xs text-slate-400">
+                  New resident in Nashik?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMessages();
+                      setMode('signup');
+                    }}
+                    className="font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    Create New Account
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* MODE 2: CITIZEN REGISTRATION */}
+          {mode === 'signup' && (
+            <div>
+              <div className="mb-5 text-center">
+                <h2 className="text-lg font-bold text-white">Create Citizen Account</h2>
+                <p className="text-xs text-slate-400 mt-1">Register for doorstep waste & e-waste services</p>
+              </div>
+
+              <form onSubmit={handleSignup} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Full Name</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. Ramesh Kulkarni"
+                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Email Address</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Password (min 8 chars)</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showSignupPassword ? 'text' : 'password'}
+                      required
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      className="block w-full pl-10 pr-10 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignupPassword(!showSignupPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                    >
+                      {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Confirm Password</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showSignupPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="agreeTerms"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <label htmlFor="agreeTerms" className="text-[11px] text-slate-400 cursor-pointer">
+                    I agree to the Nashik Municipal Corporation waste segregation guidelines and terms of service.
+                  </label>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Creating Account...' : 'Register Account'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+                <p className="text-xs text-slate-400">
+                  Already registered?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMessages();
+                      setMode('login');
+                    }}
+                    className="font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* MODE 3: EMAIL VERIFICATION */}
+          {mode === 'verify' && (
+            <div>
+              <div className="mb-5 text-center">
+                <h2 className="text-lg font-bold text-white">Verify Your Email</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Enter the 6-digit verification code sent to <strong className="text-white">{verifyEmail}</strong>
                 </p>
               </div>
 
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                  {loading ? 'Sending Code...' : 'Send Verification OTP'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-medium text-slate-300">Enter 6-Digit OTP</label>
+              <form onSubmit={handleVerify} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">6-Digit Verification Code</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      maxLength={8}
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value.trim())}
+                      placeholder="123456"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-center text-lg font-mono tracking-widest text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="text-[11px] text-emerald-400 hover:underline"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
                   >
-                    Change Email
+                    {loading ? 'Verifying...' : 'Verify & Activate'}
+                    <CheckCircle2 className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-center text-lg tracking-widest font-mono text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+              </form>
 
-              {devOtp && (
-                <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl flex items-center justify-between">
-                  <div className="text-[11px] text-purple-300">
-                    <span className="font-semibold flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5" /> Dev Mode OTP:
-                    </span>
-                    <span className="font-mono text-xs font-bold text-purple-200 ml-1">{devOtp}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOtpCode(devOtp)}
-                    className="text-[11px] bg-purple-600/40 hover:bg-purple-600/60 text-purple-200 px-2 py-1 rounded-md font-medium transition-colors"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-              )}
-
-              <div className="pt-2">
+              <div className="mt-5 pt-4 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleResendCode}
                   disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  className="text-emerald-400 hover:text-emerald-300 font-medium underline cursor-pointer"
                 >
-                  {loading ? 'Verifying...' : 'Verify & Enter Dashboard'}
-                  <ArrowRight className="w-4 h-4" />
+                  Resend verification code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="hover:text-white transition-colors cursor-pointer"
+                >
+                  Back to Sign In
                 </button>
               </div>
-            </form>
+            </div>
           )}
 
-          <div className="mt-6 pt-6 border-t border-slate-700/60">
-            <div className="text-center text-xs text-slate-400 space-y-2">
-              <p>
-                Are you a Municipal Worker?{' '}
-                <Link to="/worker/login" className="text-emerald-400 hover:text-emerald-300 font-semibold underline">
-                  Worker Field Portal
-                </Link>
-              </p>
-              <p>
-                Municipal Organization Officer?{' '}
-                <Link to="/organization/login" className="text-teal-400 hover:text-teal-300 font-semibold underline">
-                  Admin Sign In
-                </Link>
-              </p>
-              <p className="pt-2">
-                <Link to="/" className="text-slate-500 hover:text-slate-300">
-                  ← Back to Home
-                </Link>
-              </p>
+          {/* MODE 4: FORGOT PASSWORD */}
+          {mode === 'forgot' && (
+            <div>
+              <div className="mb-5 text-center">
+                <h2 className="text-lg font-bold text-white">Reset Forgotten Password</h2>
+                <p className="text-xs text-slate-400 mt-1">Enter your registered email to receive a secure reset code</p>
+              </div>
+
+              <form onSubmit={handleForgotRequest} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Registered Email Address</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Sending Code...' : 'Send Reset Code'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Remembered your password? Sign In
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* MODE 5: ENTER NEW PASSWORD */}
+          {mode === 'reset' && (
+            <div>
+              <div className="mb-5 text-center">
+                <h2 className="text-lg font-bold text-white">Enter New Password</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Enter the code sent to <strong className="text-white">{resetEmail}</strong> and your new password
+                </p>
+              </div>
+
+              <form onSubmit={handleResetConfirm} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Reset Code</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value.trim())}
+                      placeholder="6-digit reset code"
+                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">New Password (min 8 chars)</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="block w-full pl-10 pr-10 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                    >
+                      {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300">Confirm New Password</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      required
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Updating Password...' : 'Save New Password'}
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancel and Return to Sign In
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
