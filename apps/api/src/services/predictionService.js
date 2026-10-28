@@ -128,6 +128,9 @@ export class PredictionService {
       observationAgeHours: Math.round(observationAgeHours * 10) / 10,
       observationDisplay: `Last recorded observation: ${Math.round(currentFill)}%, ${ageDisplay}`,
       predictedNextDayFill: mlResult.predictedNextDayFill,
+      predictedFillTomorrow: mlResult.predictedNextDayFill,
+      riskCategory: mlResult.overflowRisk ? 'HIGH' : 'NORMAL',
+      method: mlResult.modelVersion || 'Ridge Regression (Pure JS)',
       overflowRisk: mlResult.overflowRisk,
       overflowRiskLabel: mlResult.overflowRiskLabel,
       predictionHorizon: mlResult.predictionHorizon,
@@ -135,9 +138,9 @@ export class PredictionService {
       modelVersion: mlResult.modelVersion,
       confidenceLevel: mlResult.confidenceLevel,
       confidenceScore: mlResult.confidenceScore,
-      dataProvenance: 'statistical_model_prediction',
+      dataProvenance: 'SYNTHETIC_SIMULATION',
       label: mlResult.label,
-      disclaimer: mlResult.disclaimer,
+      disclaimer: `${mlResult.disclaimer} Trained on SYNTHETIC_SIMULATION timeseries records.`,
       isRealMeasurement: false,
     };
   }

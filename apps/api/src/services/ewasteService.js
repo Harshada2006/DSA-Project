@@ -2,10 +2,10 @@ import { prisma } from '../database/client.js';
 import { logAuditEvent } from '../middleware/auth.js';
 
 export class EWasteService {
-  /**
-   * Submit citizen e-waste pickup request.
-   * Simple form with non-essential fields optional.
-   */
+  /* ============================================================
+   * MODULE 1: Citizen E-Waste Pickup Booking & Validation
+   * Accepts resident e-waste pickup requests with contact & location
+   * ============================================================ */
   async submitPickupRequest(citizenUser, data, req) {
     const {
       category,
@@ -49,7 +49,7 @@ export class EWasteService {
         ticketNo,
         citizenId: citizenUser?.id || null,
         citizenName: citizenUser?.name || 'Nashik Resident',
-        citizenEmail: citizenUser?.email || '',
+        citizenEmail: (citizenUser?.email || '').trim().toLowerCase(),
         contactPhone: phone,
         pickupAddress: effectiveAddress,
         itemsDescription: effectiveDesc,
@@ -73,18 +73,26 @@ export class EWasteService {
     return {
       ...request,
       trackingNumber: request.ticketNo,
+      category: request.itemsDescription,
+      address: request.pickupAddress,
       preferredDate: request.preferredPickupDate ? request.preferredPickupDate.toISOString().split('T')[0] : null,
     };
   }
 
-  /**
-   * List e-waste pickup requests with role scoping
-   */
+  /* ============================================================
+   * MODULE: E-Waste Requests Retrieval & Role Scoping
+   * Citizens see their requests; Workers see assigned; Admin sees all
+   * ============================================================ */
   async getRequests(user, filters = {}) {
     const where = {};
 
     if (user.role === 'CITIZEN') {
-      where.citizenId = user.id;
+      const emailLower = (user.email || '').toLowerCase();
+      where.OR = [
+        { citizenId: user.id },
+        { citizenEmail: emailLower },
+        { citizenEmail: user.email },
+      ];
     } else if (user.role === 'WORKER') {
       // Worker sees assigned or open collectable requests
       where.OR = [
@@ -95,7 +103,7 @@ export class EWasteService {
 
     if (filters.status) where.status = filters.status;
 
-    return await prisma.eWasteRequest.findMany({
+    const list = await prisma.eWasteRequest.findMany({
       where,
       include: {
         citizen: { select: { id: true, name: true, email: true } },
@@ -106,11 +114,22 @@ export class EWasteService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Normalize field aliases so frontend never encounters undefined properties
+    return list.map((r) => ({
+      ...r,
+      trackingNumber: r.ticketNo,
+      category: r.itemsDescription || 'Electronic Waste',
+      address: r.pickupAddress,
+      description: r.itemsDescription,
+      preferredDate: r.preferredPickupDate ? r.preferredPickupDate.toISOString().split('T')[0] : null,
+    }));
   }
 
-  /**
-   * Assign worker to e-waste request (Admin only)
-   */
+  /* ============================================================
+   * MODULE 3: Municipal Worker Assignment & Dispatch
+   * Assigns field worker and compactor van to pickup task
+   * ============================================================ */
   async assignWorker(requestId, workerId, adminUser, req) {
     const request = await prisma.eWasteRequest.findUnique({ where: { id: requestId } });
     if (!request) throw new Error('E-waste request not found.');
@@ -141,9 +160,10 @@ export class EWasteService {
     return updated;
   }
 
-  /**
-   * Record e-waste collection completion (Worker)
-   */
+  /* ============================================================
+   * MODULE 4: Field Doorstep Collection Verification
+   * Worker confirms pickup, measured weight, and updates status
+   * ============================================================ */
   async recordWorkerCollection(requestId, collectionData, workerUser, req) {
     const request = await prisma.eWasteRequest.findUnique({ where: { id: requestId } });
     if (!request) throw new Error('E-waste request not found.');
@@ -177,9 +197,10 @@ export class EWasteService {
     return updated;
   }
 
-  /**
-   * Record handover to destination facility (Worker or Admin)
-   */
+  /* ============================================================
+   * MODULE 5: Authorized Recycler Facility Handover & Manifest
+   * Logs chain-of-custody transfer to verified recycling facility
+   * ============================================================ */
   async recordFacilityHandover(handoverData, user, req) {
     const {
       facilityId,

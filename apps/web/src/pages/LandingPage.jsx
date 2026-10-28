@@ -67,13 +67,13 @@ export const LandingPage = () => {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent flex items-end p-6 sm:p-8">
               <div className="text-left text-white max-w-xl">
                 <span className="bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block mb-1.5 shadow-xs">
-                  Swachh Nashik Mission
+                  {t('mission_badge', 'Swachh Nashik Mission')}
                 </span>
                 <h2 className="text-xl sm:text-2xl font-bold text-white drop-shadow-md">
-                  Historic Ramkund & Godavari Ghat, Panchavati
+                  {t('ramkund_title', 'Historic Ramkund & Godavari Ghat, Panchavati')}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-200 mt-1">
-                  Active municipal sanitation across Panchavati, CIDCO, Satpur, Nashik Road, and Old Nashik.
+                  {t('ramkund_desc', 'Active municipal sanitation across Panchavati, CIDCO, Satpur, Nashik Road, and Old Nashik.')}
                 </p>
               </div>
             </div>
@@ -163,18 +163,18 @@ export const LandingPage = () => {
             <div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-emerald-600" />
-                Nashik Waste Infrastructure Map
+                {t('landing_map_title', 'Nashik Waste Infrastructure Map')}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Visualizing registered bins, NMC wards, and certified recycling facilities
+                {t('landing_map_desc', 'Visualizing registered bins, NMC wards, and certified recycling facilities')}
               </p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full font-semibold border border-emerald-200 dark:border-emerald-700">
-                {bins.length} Monitored Bins
+                {bins.length} {t('monitored_bins', 'Monitored Bins')}
               </span>
               <span className="text-xs bg-purple-50 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 px-3 py-1 rounded-full font-semibold border border-purple-200 dark:border-purple-700">
-                {facilities.length} Verified Facilities
+                {facilities.length} {t('verified_facilities', 'Verified Facilities')}
               </span>
             </div>
           </div>
@@ -202,9 +202,9 @@ export const LandingPage = () => {
             Nashik Municipal Corporation (NMC) • Solid Waste Management Cell • Maharashtra
           </p>
           <div className="flex items-center gap-4 text-slate-400 font-medium">
-            <Link to="/citizen/login" className="hover:text-white transition-colors">Citizen</Link>
-            <Link to="/worker/login" className="hover:text-white transition-colors">Worker</Link>
-            <Link to="/organization/login" className="hover:text-white transition-colors">Admin</Link>
+            <Link to="/citizen/login" className="hover:text-white transition-colors">{t('nav_citizen', 'Citizen')}</Link>
+            <Link to="/worker/login" className="hover:text-white transition-colors">{t('nav_worker', 'Worker')}</Link>
+            <Link to="/organization/login" className="hover:text-white transition-colors">{t('nav_admin', 'Admin')}</Link>
           </div>
         </div>
       </footer>

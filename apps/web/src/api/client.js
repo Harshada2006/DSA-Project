@@ -155,6 +155,15 @@ export const api = {
 
   getBin: (id) => fetchJson(`/bins/${id}`),
 
+  getBinHistory: (id, params = {}) => {
+    const q = new URLSearchParams();
+    if (params.startDate) q.set('startDate', params.startDate);
+    if (params.endDate) q.set('endDate', params.endDate);
+    if (params.date) q.set('date', params.date);
+    if (params.limit) q.set('limit', params.limit);
+    return fetchJson(`/bins/${id}/history?${q.toString()}`);
+  },
+
   createBin: (data) =>
     fetchJson('/bins', {
       method: 'POST',
@@ -204,6 +213,29 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // Vehicle Load & Dumping Facility
+  getVehicleStatus: () => fetchJson('/tasks/vehicle/status'),
+
+  unloadVehicle: (vehicleId) =>
+    fetchJson('/tasks/vehicle/unload', {
+      method: 'POST',
+      body: JSON.stringify({ vehicleId }),
+    }),
+
+  getRouteToDumping: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.avoidBlocked !== undefined) q.set('avoidBlocked', params.avoidBlocked);
+    if (params.sourceNodeId) q.set('sourceNodeId', params.sourceNodeId);
+    return fetchJson(`/tasks/vehicle/route-to-dumping?${q.toString()}`);
+  },
+
+  getRouteToBin: (binId, params = {}) => {
+    const q = new URLSearchParams();
+    if (params.avoidBlocked !== undefined) q.set('avoidBlocked', params.avoidBlocked);
+    if (params.sourceNodeId) q.set('sourceNodeId', params.sourceNodeId);
+    return fetchJson(`/tasks/bin/${binId}/route?${q.toString()}`);
+  },
 
   // Complaints
   submitComplaint: (data) =>

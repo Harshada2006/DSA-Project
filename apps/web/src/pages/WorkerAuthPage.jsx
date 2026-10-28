@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import { api } from '../api/client.js';
+import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
+import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
 import {
   Truck,
   Lock,
@@ -15,13 +18,15 @@ import {
   KeyRound,
   Mail,
   ShieldCheck,
+  Zap,
 } from 'lucide-react';
 
 export const WorkerAuthPage = () => {
+  const { t } = useLanguage();
   // Modes: 'login' | 'activate' | 'forgot' | 'reset'
   const [mode, setMode] = useState('login');
 
-  // Login inputs (NO prefill / NO Quick Fill)
+  // Login inputs
   const [identifier, setIdentifier] = useState(''); // Worker ID or email
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,9 +58,12 @@ export const WorkerAuthPage = () => {
     setSuccessMsg('');
   };
 
-  // 1. Worker Sign In
+  /* ============================================================
+   * MODULE 1: Worker Authentication & Direct 1-Click Sign In
+   * Authenticates field staff via Worker ID or registered municipal email
+   * ============================================================ */
   const handleLogin = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     clearMessages();
 
     if (!identifier.trim() || !password) {
@@ -75,9 +83,12 @@ export const WorkerAuthPage = () => {
     }
   };
 
-  // 2. Worker Account Activation
+  /* ============================================================
+   * MODULE 2: Worker Account Activation with Provisioning Token
+   * Activates pending worker profiles using tokens issued by administrators
+   * ============================================================ */
   const handleActivate = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     clearMessages();
 
     if (!actWorkerId.trim() || !actToken.trim()) {
@@ -105,7 +116,6 @@ export const WorkerAuthPage = () => {
       setSuccessMsg(res.message || 'Worker account successfully activated! Please sign in.');
       setIdentifier(actWorkerId.trim());
       setMode('login');
-      // Reset sensitive activation fields
       setActToken('');
       setActPassword('');
       setActConfirmPassword('');
@@ -176,20 +186,25 @@ export const WorkerAuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden transition-colors">
       {/* Background glow effects */}
       <div className="absolute top-0 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Return home link */}
+      {/* Return home link and Controls */}
       <div className="absolute top-6 left-6 z-20">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors shadow-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to EcoNexus Home</span>
+          <span>{t('back_to_home', 'Back to EcoNexus Home')}</span>
         </Link>
+      </div>
+
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+        <LanguageSelector />
+        <ThemeToggle />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
@@ -200,18 +215,18 @@ export const WorkerAuthPage = () => {
             </div>
           </div>
         </div>
-        <h1 className="text-center text-2xl font-bold tracking-tight text-white">
-          Worker Sign In
+        <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          {t('portal_worker_title', 'Field Worker Portal')}
         </h1>
-        <p className="mt-1 text-center text-xs text-slate-400">
-          Access your assigned collections, tasks and e-waste handovers.
+        <p className="mt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+          {t('portal_worker_desc', 'View daily collection schedules, suggested optimized routes, scan bin assets, and report field issues.')}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-800/85 backdrop-blur-xl border border-slate-700/60 shadow-2xl rounded-2xl p-6 sm:p-8">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl p-6 sm:p-8 transition-colors">
           {/* Top navigation tabs between Sign In and Activate Account */}
-          <div className="flex rounded-xl bg-slate-900/70 p-1 mb-6 border border-slate-700/50">
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 mb-6 border border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={() => {
@@ -220,8 +235,8 @@ export const WorkerAuthPage = () => {
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 mode === 'login'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Worker Sign In
@@ -234,8 +249,8 @@ export const WorkerAuthPage = () => {
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 mode === 'activate'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Activate Account
@@ -244,15 +259,15 @@ export const WorkerAuthPage = () => {
 
           {/* Feedback messages */}
           {error && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-600 dark:text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>{successMsg}</span>
             </div>
           )}
@@ -260,12 +275,14 @@ export const WorkerAuthPage = () => {
           {/* 1. WORKER SIGN IN */}
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
+
+
               <div>
-                <label className="block text-xs font-semibold text-slate-300">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Worker ID or Work Email
                 </label>
                 <div className="mt-1 relative rounded-xl shadow-xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                     <UserCheck className="h-4 w-4" />
                   </div>
                   <input
@@ -273,15 +290,15 @@ export const WorkerAuthPage = () => {
                     required
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="e.g. WRK-NSK-101 or worker@econexus.gov.in"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="e.g. WRK-NSK-101 or 101 or worker1"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-300">Password</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -289,13 +306,13 @@ export const WorkerAuthPage = () => {
                       setResetEmail(identifier.includes('@') ? identifier : '');
                       setMode('forgot');
                     }}
-                    className="text-xs text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
+                    className="text-xs text-amber-600 dark:text-amber-400 hover:underline font-medium cursor-pointer"
                   >
                     Forgot Password?
                   </button>
                 </div>
                 <div className="mt-1 relative rounded-xl shadow-xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                     <Lock className="h-4 w-4" />
                   </div>
                   <input
@@ -303,13 +320,13 @@ export const WorkerAuthPage = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your worker password"
-                    className="block w-full pl-10 pr-10 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="Enter worker password"
+                    className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -323,13 +340,13 @@ export const WorkerAuthPage = () => {
                   disabled={loading}
                   className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
                 >
-                  {loading ? 'Authenticating...' : 'Sign In'}
+                  {loading ? 'Authenticating...' : 'Sign In as Field Worker'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
-                <p className="text-xs text-slate-400">
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   New worker with an invitation?{' '}
                   <button
                     type="button"
@@ -337,7 +354,7 @@ export const WorkerAuthPage = () => {
                       clearMessages();
                       setMode('activate');
                     }}
-                    className="font-semibold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    className="font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                   >
                     Activate Account
                   </button>
@@ -350,26 +367,22 @@ export const WorkerAuthPage = () => {
           {mode === 'activate' && (
             <div>
               <div className="mb-4 text-left">
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-500" />
                   Activate Invited Worker Account
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Workers are provisioned by your municipal organization supervisor. Enter your Worker ID, activation token, and create your password.
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Workers are provisioned by your municipal supervisor. Activate with your invitation token.
                 </p>
-                <div className="mt-2.5 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
-                  <span className="font-bold">Testing Invitation Token?</span> Use sample pending worker:
-                  <div className="font-mono mt-1 text-[11px] text-amber-300">
-                    ID: <strong className="text-white">WRK-NSK-103</strong> • Token: <strong className="text-white">ACT-NSK-2026</strong>
-                  </div>
-                </div>
+
+
               </div>
 
               <form onSubmit={handleActivate} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Worker ID or Registered Work Email</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Worker ID or Registered Work Email</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <UserCheck className="h-4 w-4" />
                     </div>
                     <input
@@ -378,17 +391,17 @@ export const WorkerAuthPage = () => {
                       value={actWorkerId}
                       onChange={(e) => setActWorkerId(e.target.value)}
                       placeholder="e.g. WRK-NSK-103 or worker.pending@econexus.gov.in"
-                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Activation Token (Issued by Administrator)
                   </label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <KeyRound className="h-4 w-4" />
                     </div>
                     <input
@@ -396,16 +409,16 @@ export const WorkerAuthPage = () => {
                       required
                       value={actToken}
                       onChange={(e) => setActToken(e.target.value.trim())}
-                      placeholder="Enter activation token"
-                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="e.g. ACT-NSK-2026"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Create New Password (min 8 chars)</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Create New Password (min 8 chars)</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -414,12 +427,12 @@ export const WorkerAuthPage = () => {
                       value={actPassword}
                       onChange={(e) => setActPassword(e.target.value)}
                       placeholder="At least 8 characters"
-                      className="block w-full pl-10 pr-10 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowActPassword(!showActPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     >
                       {showActPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -427,9 +440,9 @@ export const WorkerAuthPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Confirm Password</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Confirm Password</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -438,7 +451,7 @@ export const WorkerAuthPage = () => {
                       value={actConfirmPassword}
                       onChange={(e) => setActConfirmPassword(e.target.value)}
                       placeholder="Confirm password"
-                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
@@ -455,14 +468,14 @@ export const WorkerAuthPage = () => {
                 </div>
               </form>
 
-              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
                 <button
                   type="button"
                   onClick={() => {
                     clearMessages();
                     setMode('login');
                   }}
-                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Already activated? Return to Sign In
                 </button>
@@ -470,21 +483,24 @@ export const WorkerAuthPage = () => {
             </div>
           )}
 
-          {/* 3. WORKER FORGOT PASSWORD */}
+          {/* ============================================================
+           * MODULE 3: Worker Password Recovery & Reset
+           * Handles municipal worker password resets via verified email code
+           * ============================================================ */}
           {mode === 'forgot' && (
             <div>
               <div className="mb-4 text-left">
-                <h2 className="text-sm font-bold text-white">Reset Worker Password</h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Reset Worker Password</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Enter your registered work email to receive a password reset token.
                 </p>
               </div>
 
               <form onSubmit={handleForgotRequest} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Registered Work Email</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Registered Work Email</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Mail className="h-4 w-4" />
                     </div>
                     <input
@@ -493,7 +509,7 @@ export const WorkerAuthPage = () => {
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="worker@econexus.gov.in"
-                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
@@ -510,14 +526,14 @@ export const WorkerAuthPage = () => {
                 </div>
               </form>
 
-              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
                 <button
                   type="button"
                   onClick={() => {
                     clearMessages();
                     setMode('login');
                   }}
-                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Return to Worker Sign In
                 </button>
@@ -529,17 +545,17 @@ export const WorkerAuthPage = () => {
           {mode === 'reset' && (
             <div>
               <div className="mb-4 text-left">
-                <h2 className="text-sm font-bold text-white">Enter New Worker Password</h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Enter the reset code sent to <strong className="text-white">{resetEmail}</strong> and your new password.
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Enter New Worker Password</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Enter the reset code sent to <strong className="text-slate-900 dark:text-white font-mono">{resetEmail}</strong> and your new password.
                 </p>
               </div>
 
               <form onSubmit={handleResetConfirm} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Reset Code</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Reset Code</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <KeyRound className="h-4 w-4" />
                     </div>
                     <input
@@ -548,15 +564,15 @@ export const WorkerAuthPage = () => {
                       value={resetCode}
                       onChange={(e) => setResetCode(e.target.value.trim())}
                       placeholder="6-digit reset code"
-                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">New Password (min 8 chars)</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">New Password (min 8 chars)</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -565,12 +581,12 @@ export const WorkerAuthPage = () => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
-                      className="block w-full pl-10 pr-10 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowResetPassword(!showResetPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     >
                       {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -578,9 +594,9 @@ export const WorkerAuthPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Confirm New Password</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Confirm New Password</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -589,7 +605,7 @@ export const WorkerAuthPage = () => {
                       value={confirmNewPassword}
                       onChange={(e) => setConfirmNewPassword(e.target.value)}
                       placeholder="Confirm new password"
-                      className="block w-full pl-10 pr-3 py-2 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 </div>
@@ -606,14 +622,14 @@ export const WorkerAuthPage = () => {
                 </div>
               </form>
 
-              <div className="mt-5 pt-4 border-t border-slate-700/60 text-center">
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
                 <button
                   type="button"
                   onClick={() => {
                     clearMessages();
                     setMode('login');
                   }}
-                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel and Return to Sign In
                 </button>

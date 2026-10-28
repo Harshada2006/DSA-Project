@@ -303,6 +303,67 @@ async function runTests() {
     assert.ok(csv.includes('Bin Code'));
   });
 
+  // 12. Bin 180-Day Historical Observations & Chronological Consistency (Phase 2 & 4)
+  await test('Bin 180-Day History & Chronological State Consistency', async () => {
+    const bin = await prisma.bin.findFirst();
+    assert.ok(bin);
+
+    const history = await binService.getBinHistory(bin.id, { limit: 180 });
+    assert.ok(history.bin);
+    assert.ok(history.timeline.length > 0);
+    assert.ok(history.timeline.length <= 180);
+    assert.ok(history.prediction);
+    assert.strictEqual(typeof history.prediction.predictedFillTomorrow, 'number');
+    assert.ok(history.prediction.disclaimer.includes('SYNTHETIC_SIMULATION'));
+
+    // Check bounded fill percentages
+    for (const obs of history.timeline) {
+      assert.ok(obs.fillPercentage >= 0 && obs.fillPercentage <= 100);
+      assert.ok(obs.estimatedVolumeLitres >= 0);
+    }
+  });
+
+  // 13. Vehicle Capacity Tracking & Municipal Dumping Facility Routing (Phase 6 & 7)
+  await test('Vehicle Capacity Tracking & Dumping Facility Shortest-Path Routing', async () => {
+    const worker = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    assert.ok(worker);
+
+    // Get vehicle status
+    const status = await taskService.getVehicleStatus(worker);
+    assert.ok(status.vehicle);
+    assert.ok(status.dumpingFacility);
+    assert.strictEqual(status.dumpingFacility.nodeId, 'N-PAT');
+    assert.ok(status.vehicle.capacityKg > 0);
+
+    // Route to dumping facility
+    const dumpingRoute = await taskService.getRouteToDumpingFacility({ avoidBlocked: true });
+    assert.strictEqual(dumpingRoute.reachable, true);
+    assert.strictEqual(dumpingRoute.target_id, 'N-PAT');
+    assert.ok(dumpingRoute.distance_meters > 0);
+    assert.ok(dumpingRoute.coordinate_path.length >= 2);
+
+    // Unload vehicle
+    const unloadRes = await taskService.recordTruckUnload(status.vehicle.id, worker, {});
+    assert.strictEqual(unloadRes.success, true);
+    assert.strictEqual(unloadRes.vehicle.currentLoadKg, 0.0);
+    assert.strictEqual(unloadRes.vehicle.isFull, false);
+  });
+
+  // 14. Duplicate Collection Submission Prevention (Phase 6 & 12)
+  await test('Duplicate Collection Submission Rejection', async () => {
+    const worker = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    const completedTask = await prisma.collectionTask.findFirst({
+      where: { status: 'collected' },
+    });
+
+    if (completedTask) {
+      await assert.rejects(
+        async () => taskService.recordCollection(completedTask.id, { weightKg: 50 }, worker, {}),
+        /already been completed/
+      );
+    }
+  });
+
   console.log('====================================================');
   console.log(`  TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log('====================================================');

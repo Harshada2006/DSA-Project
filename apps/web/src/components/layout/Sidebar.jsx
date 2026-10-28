@@ -58,14 +58,14 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 Nashik
               </span>
             </div>
-            <p className="text-xs text-slate-400">Municipal Admin Portal</p>
+            <p className="text-xs text-slate-400">{t('admin_portal_subtitle', 'Municipal Admin Portal')}</p>
           </div>
         </div>
 
         {/* Navigation Links */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
           <div className="px-3 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Operations & Planning
+            {t('operations_planning', 'Operations & Planning')}
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;

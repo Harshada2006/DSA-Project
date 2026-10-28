@@ -4,6 +4,7 @@ import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { SearchInput } from '../components/common/SearchInput.jsx';
+import { BinHistoryModal } from '../components/bins/BinHistoryModal.jsx';
 import {
   Plus,
   RefreshCw,
@@ -13,6 +14,7 @@ import {
   MapPin,
   Sparkles,
   Info,
+  TrendingUp,
 } from 'lucide-react';
 
 export const BinsPage = () => {
@@ -42,8 +44,9 @@ export const BinsPage = () => {
     notes: '',
   });
 
-  // Selected bin detail modal
+  // Selected bin detail modal & history analysis modal
   const [detailBin, setDetailBin] = useState(null);
+  const [historyBin, setHistoryBin] = useState(null);
 
   const showToast = (type, message) => {
     setFeedback({ type, message });
@@ -170,7 +173,7 @@ export const BinsPage = () => {
             <select
               value={selectedWard}
               onChange={(e) => setSelectedWard(e.target.value)}
-              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="px-3.5 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">All Wards</option>
               {wards.map((w) => (
@@ -183,7 +186,7 @@ export const BinsPage = () => {
             <select
               value={selectedUrgency}
               onChange={(e) => setSelectedUrgency(e.target.value)}
-              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="px-3.5 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">All Urgencies</option>
               <option value="critical">Critical Only</option>
@@ -195,7 +198,7 @@ export const BinsPage = () => {
             <select
               value={selectedWasteType}
               onChange={(e) => setSelectedWasteType(e.target.value)}
-              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="px-3.5 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="">All Waste Streams</option>
               <option value="SOLID">Solid / Mixed</option>
@@ -211,7 +214,7 @@ export const BinsPage = () => {
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider text-xs">
               <tr>
                 <th className="p-3.5">Asset Code & Name</th>
                 <th className="p-3.5">Nashik Ward</th>
@@ -221,7 +224,7 @@ export const BinsPage = () => {
                 <th className="p-3.5 text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="text-center p-8 text-slate-400">
@@ -231,7 +234,7 @@ export const BinsPage = () => {
                 </tr>
               ) : filteredBins.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center p-8 text-slate-500">
+                  <td colSpan={6} className="text-center p-8 text-slate-500 dark:text-slate-400">
                     No bins match your current filters.
                   </td>
                 </tr>
@@ -243,41 +246,49 @@ export const BinsPage = () => {
                   else if (fill >= 60) fillBarColor = 'bg-amber-500';
 
                   return (
-                    <tr key={bin.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={bin.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="p-3.5">
-                        <div className="font-mono font-bold text-slate-900 text-sm">{bin.code}</div>
-                        <div className="text-slate-600 text-xs font-medium">{bin.name}</div>
+                        <div className="font-mono font-bold text-slate-900 dark:text-white text-sm">{bin.code}</div>
+                        <div className="text-slate-600 dark:text-slate-400 text-xs font-medium">{bin.name}</div>
                       </td>
                       <td className="p-3.5">
-                        <div className="text-slate-800 font-semibold text-xs">{bin.ward?.name || 'Nashik Ward'}</div>
-                        <div className="text-slate-500 text-[11px] uppercase">{bin.areaCategory}</div>
+                        <div className="text-slate-800 dark:text-slate-200 font-semibold text-xs">{bin.ward?.name || 'Nashik Ward'}</div>
+                        <div className="text-slate-500 dark:text-slate-400 text-[11px] uppercase">{bin.areaCategory}</div>
                       </td>
                       <td className="p-3.5">
-                        <div className="text-slate-800 capitalize font-medium text-xs">{bin.wasteType}</div>
-                        <div className="text-slate-500 text-[11px]">{bin.capacityLiters} Liters</div>
+                        <div className="text-slate-800 dark:text-slate-200 capitalize font-medium text-xs">{bin.wasteType}</div>
+                        <div className="text-slate-500 dark:text-slate-400 text-[11px]">{bin.capacityLiters} Liters</div>
                       </td>
                       <td className="p-3.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                          <div className="w-16 bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
                             <div className={`h-full ${fillBarColor}`} style={{ width: `${Math.min(100, fill)}%` }} />
                           </div>
-                          <span className="font-mono font-bold text-slate-800 text-sm">{Math.round(fill)}%</span>
-                          <span className="text-[10px] text-slate-400">est.</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">{Math.round(fill)}%</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">est.</span>
                         </div>
                       </td>
                       <td className="p-3.5">
-                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs">
+                        <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded text-xs">
                           {Math.round(bin.priorityScore || 0)}
                         </span>
                       </td>
-                      <td className="p-3.5 text-right">
+                      <td className="p-3.5 text-right flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="secondary"
+                          size="xs"
+                          onClick={() => setHistoryBin(bin)}
+                          icon={<TrendingUp className="w-3 h-3 text-emerald-600" />}
+                        >
+                          History
+                        </Button>
                         <Button
                           variant="outline"
                           size="xs"
                           onClick={() => setDetailBin(bin)}
                           icon={<Info className="w-3 h-3" />}
                         >
-                          View Info
+                          Info
                         </Button>
                       </td>
                     </tr>
@@ -289,57 +300,68 @@ export const BinsPage = () => {
         </div>
       </Card>
 
-      {/* Asset Info Modal (Section 24: No raw coordinates in address text) */}
+      {/* Asset Info Modal */}
       {detailBin && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <span className="font-mono font-bold text-amber-700 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                <span className="font-mono font-bold text-amber-700 dark:text-amber-400 text-xs bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
                   {detailBin.code}
                 </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{detailBin.name}</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">{detailBin.name}</h3>
               </div>
               <button
                 onClick={() => setDetailBin(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs text-slate-700">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Administrative Ward:</span>
-                <strong className="text-slate-900">{detailBin.ward?.name || 'Nashik'} ({detailBin.ward?.zone || 'Zone'})</strong>
+            <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Administrative Ward:</span>
+                <strong className="text-slate-900 dark:text-white">{detailBin.ward?.name || 'Nashik'} ({detailBin.ward?.zone || 'Zone'})</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Area Category:</span>
-                <strong className="text-slate-900 capitalize">{detailBin.areaCategory}</strong>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Area Category:</span>
+                <strong className="text-slate-900 dark:text-white capitalize">{detailBin.areaCategory}</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Container Capacity:</span>
-                <strong className="text-slate-900">{detailBin.capacityLiters} Liters</strong>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Container Capacity:</span>
+                <strong className="text-slate-900 dark:text-white">{detailBin.capacityLiters} Liters</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Waste Classification:</span>
-                <strong className="text-slate-900 capitalize">{detailBin.wasteType}</strong>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Waste Classification:</span>
+                <strong className="text-slate-900 dark:text-white capitalize">{detailBin.wasteType}</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Estimated Next-Day Fill:</span>
-                <strong className="text-slate-900 font-mono text-sm">~{Math.round(detailBin.currentFillPercentage || 0)}%</strong>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Estimated Next-Day Fill:</span>
+                <strong className="text-slate-900 dark:text-white font-mono text-sm">~{Math.round(detailBin.currentFillPercentage || 0)}%</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Collection Priority Score:</span>
-                <strong className="text-emerald-700 font-mono text-sm">{Math.round(detailBin.priorityScore || 0)} / 100</strong>
+              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Collection Priority Score:</span>
+                <strong className="text-emerald-700 dark:text-emerald-400 font-mono text-sm">{Math.round(detailBin.priorityScore || 0)} / 100</strong>
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500">
-              <strong>Prediction Horizon:</strong> Expected fill level tomorrow (24h horizon). Fill level is statistical estimation, not a physical sensor measurement.
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-xs text-slate-500 dark:text-slate-400">
+              <strong>Prediction Horizon:</strong> Expected fill level tomorrow (24h horizon). Fill level is statistical estimation from 180-day baseline, not a physical sensor measurement.
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex justify-between gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setHistoryBin(detailBin);
+                  setDetailBin(null);
+                }}
+                icon={<TrendingUp className="w-3.5 h-3.5 text-emerald-600" />}
+              >
+                180-Day History & Predictions
+              </Button>
               <Button variant="primary" size="sm" onClick={() => setDetailBin(null)}>
                 Close
               </Button>
@@ -348,49 +370,57 @@ export const BinsPage = () => {
         </div>
       )}
 
+      {/* 180-Day Historical Timeseries & Overflow Prediction Modal */}
+      <BinHistoryModal
+        isOpen={!!historyBin}
+        onClose={() => setHistoryBin(null)}
+        bin={historyBin}
+        allBins={bins}
+      />
+
       {/* Add Asset Modal */}
       {isAddOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Register Municipal Bin Asset</h3>
-            <p className="text-xs text-slate-500 mb-5">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Register Municipal Bin Asset</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
               Add a new waste receptacle mapped to Nashik administrative wards.
             </p>
 
             <form onSubmit={handleCreateBin} className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Asset Code *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Asset Code *</label>
                   <input
                     type="text"
                     required
                     value={addForm.code}
                     onChange={(e) => setAddForm({ ...addForm, code: e.target.value.toUpperCase() })}
                     placeholder="e.g. BIN-NSK-PAN-015"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Asset Name *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Asset Name *</label>
                   <input
                     type="text"
                     required
                     value={addForm.name}
                     onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                     placeholder="e.g. Ramkund Main Steps Bin"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Nashik Ward *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nashik Ward *</label>
                   <select
                     required
                     value={addForm.wardId}
                     onChange={(e) => setAddForm({ ...addForm, wardId: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   >
                     {wards.map((w) => (
                       <option key={w.id} value={w.id}>
@@ -400,11 +430,11 @@ export const BinsPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Area Category *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Area Category *</label>
                   <select
                     value={addForm.areaCategory}
                     onChange={(e) => setAddForm({ ...addForm, areaCategory: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   >
                     <option value="commercial">Commercial Market</option>
                     <option value="residential">Residential Colony</option>
@@ -416,22 +446,22 @@ export const BinsPage = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Capacity (Liters) *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Capacity (Liters) *</label>
                   <input
                     type="number"
                     min="100"
                     required
                     value={addForm.capacityLiters}
                     onChange={(e) => setAddForm({ ...addForm, capacityLiters: parseInt(e.target.value, 10) || 1100 })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Waste Stream *</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Waste Stream *</label>
                   <select
                     value={addForm.wasteType}
                     onChange={(e) => setAddForm({ ...addForm, wasteType: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                   >
                     <option value="SOLID">Solid / Mixed</option>
                     <option value="ORGANIC">Organic / Wet</option>
@@ -441,7 +471,7 @@ export const BinsPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Button variant="outline" size="sm" onClick={() => setIsAddOpen(false)} type="button">
                   Cancel
                 </Button>

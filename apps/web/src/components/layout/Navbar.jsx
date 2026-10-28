@@ -44,7 +44,7 @@ export const Navbar = () => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
             >
               <User className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Citizen</span>
+              <span>{t('nav_citizen', 'Citizen')}</span>
             </Link>
 
             <Link
@@ -52,7 +52,7 @@ export const Navbar = () => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700"
             >
               <Briefcase className="w-3.5 h-3.5 text-amber-600" />
-              <span>Worker</span>
+              <span>{t('nav_worker', 'Worker')}</span>
             </Link>
 
             <Link
@@ -60,7 +60,7 @@ export const Navbar = () => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-colors"
             >
               <Shield className="w-3.5 h-3.5 text-emerald-200" />
-              <span className="hidden sm:inline">Admin</span>
+              <span className="hidden sm:inline">{t('nav_admin', 'Admin')}</span>
             </Link>
           </div>
         </div>

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import { api } from '../api/client.js';
+import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
+import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
 import {
   Mail,
   Lock,
@@ -15,9 +18,11 @@ import {
   ArrowLeft,
   KeyRound,
   Info,
+  Zap,
 } from 'lucide-react';
 
 export const CitizenAuthPage = () => {
+  const { t } = useLanguage();
   // Modes: 'login' | 'signup' | 'verify' | 'forgot' | 'reset'
   const [mode, setMode] = useState('login');
 
@@ -59,9 +64,12 @@ export const CitizenAuthPage = () => {
     setSuccessMsg('');
   };
 
-  // 1. Citizen Password Login
+  /* ============================================================
+   * MODULE 1: Citizen Password Authentication & 1-Click Login
+   * Authenticates registered residents of Nashik
+   * ============================================================ */
   const handleLogin = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     clearMessages();
 
     if (!loginEmail || !loginPassword) {
@@ -89,9 +97,11 @@ export const CitizenAuthPage = () => {
     }
   };
 
-  // 2. Citizen Registration
+  /* ============================================================
+   * MODULE 2: Citizen Account Registration & Email Verification
+   * ============================================================ */
   const handleSignup = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     clearMessages();
 
     if (!fullName.trim()) {
@@ -125,11 +135,11 @@ export const CitizenAuthPage = () => {
         agreeTerms,
       });
 
-      setSuccessMsg(res.message || 'Account created! Enter the verification code below to verify your email.');
       setVerifyEmail(signupEmail.trim());
       if (res.devOtpCode) {
         setDevOtp(res.devOtpCode);
       }
+      setSuccessMsg(res.message || 'Account registered! Please enter the 6-digit verification code to activate your account.');
       setMode('verify');
     } catch (err) {
       setError(err.message || 'Registration failed. Email may already be in use.');
@@ -241,20 +251,25 @@ export const CitizenAuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden transition-colors">
       {/* Background ambient accents */}
       <div className="absolute top-0 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Navigation back to landing */}
+      {/* Navigation back to landing and Controls */}
       <div className="absolute top-6 left-6 z-20">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors shadow-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to EcoNexus Home</span>
+          <span>{t('back_to_home', 'Back to EcoNexus Home')}</span>
         </Link>
+      </div>
+
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+        <LanguageSelector />
+        <ThemeToggle />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
@@ -265,42 +280,42 @@ export const CitizenAuthPage = () => {
             </div>
           </div>
         </div>
-        <h1 className="text-center text-2xl font-bold tracking-tight text-white">
-          Citizen Civic Portal
+        <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          {t('portal_citizen_title', 'Citizen Civic Portal')}
         </h1>
-        <p className="mt-1 text-center text-xs text-slate-400">
-          Nashik Municipal Corporation • Smart Waste & E-Waste Services
+        <p className="mt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+          {t('nmc_title', 'Nashik Municipal Corporation')} • Smart Waste & E-Waste Services
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-800/85 backdrop-blur-xl border border-slate-700/60 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 py-8 px-6 shadow-xl rounded-3xl sm:px-10 transition-colors">
           {/* Error Notice */}
           {error && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-600 dark:text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Success Notice */}
           {successMsg && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>{successMsg}</span>
             </div>
           )}
 
           {/* Development Mode Notice */}
           {devOtp && (
-            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200">
-              <div className="flex items-center gap-1.5 font-semibold text-amber-300 mb-0.5">
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300 mb-0.5">
                 <Info className="w-3.5 h-3.5" />
                 <span>Development Mode (Email Delivery Simulation)</span>
               </div>
-              <p className="text-[11px] text-amber-200/90">
-                Email delivery is not configured with a live SMTP server. Your verification code is:{' '}
-                <strong className="font-mono text-white text-sm bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
+              <p className="text-[11px] text-amber-700 dark:text-amber-300/90">
+                Email verification code for local testing is:{' '}
+                <strong className="font-mono text-slate-900 dark:text-white text-sm bg-amber-200/80 dark:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-400 dark:border-amber-700">
                   {devOtp}
                 </strong>
               </p>
@@ -311,15 +326,16 @@ export const CitizenAuthPage = () => {
           {mode === 'login' && (
             <div>
               <div className="mb-5 text-center">
-                <h2 className="text-lg font-bold text-white">Sign In with Password</h2>
-                <p className="text-xs text-slate-400 mt-1">Enter your registered citizen credentials</p>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Sign In with Password</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter your registered citizen credentials</p>
               </div>
+
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">Email Address</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Email Address</label>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Mail className="h-4 w-4" />
                     </div>
                     <input
@@ -328,14 +344,14 @@ export const CitizenAuthPage = () => {
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder="name@example.com"
-                      className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-slate-300">Password</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -343,13 +359,13 @@ export const CitizenAuthPage = () => {
                         setResetEmail(loginEmail);
                         setMode('forgot');
                       }}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium cursor-pointer"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline transition-colors font-medium cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </div>
                   <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Lock className="h-4 w-4" />
                     </div>
                     <input
@@ -358,12 +374,12 @@ export const CitizenAuthPage = () => {
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="block w-full pl-10 pr-10 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -377,14 +393,14 @@ export const CitizenAuthPage = () => {
                     disabled={loading}
                     className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-all cursor-pointer"
                   >
-                    {loading ? 'Signing In...' : 'Sign In'}
+                    {loading ? 'Signing In...' : 'Sign In as Citizen'}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </form>
 
-              <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
-                <p className="text-xs text-slate-400">
+              <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   New resident in Nashik?{' '}
                   <button
                     type="button"
@@ -392,7 +408,7 @@ export const CitizenAuthPage = () => {
                       clearMessages();
                       setMode('signup');
                     }}
-                    className="font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                    className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
                   >
                     Create New Account
                   </button>

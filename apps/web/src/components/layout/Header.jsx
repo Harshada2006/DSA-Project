@@ -54,7 +54,7 @@ export const Header = ({ onMenuClick }) => {
         )}
         <div>
           <h1 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
-            Nashik Municipal Operations
+            {t('admin_portal_name', 'Nashik Municipal Operations')}
             <span className="hidden sm:inline-block text-xs font-normal text-slate-500 dark:text-slate-400">
               | {t('civic_portal', 'Civic Waste Portal')}
             </span>
@@ -88,13 +88,13 @@ export const Header = ({ onMenuClick }) => {
             {user?.name ? user.name.slice(0, 2).toUpperCase() : 'NMC'}
           </div>
           <div className="hidden lg:block text-left leading-tight">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user?.name || 'Administrator'}</div>
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{user?.name || t('role_admin', 'Administrator')}</div>
             <div className="text-xs text-slate-500 dark:text-slate-400">{user?.role?.replace('_', ' ') || 'Staff'}</div>
           </div>
           <button
             onClick={logout}
             className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors ml-1 cursor-pointer"
-            title="Sign out of EcoNexus"
+            title={t('sign_out', 'Sign Out')}
           >
             <LogOut className="w-4 h-4" />
           </button>

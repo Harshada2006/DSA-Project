@@ -30,9 +30,10 @@ function isValidEmail(email) {
 }
 
 export class AuthService {
-  // -------------------------------------------------------------
-  // 1. CITIZEN AUTHENTICATION (PASSWORD LOGIN, SIGNUP & VERIFICATION)
-  // -------------------------------------------------------------
+  /* ============================================================
+   * MODULE 1: Citizen Registration & Authentication
+   * Handles citizen password signup, auto-verification, and login
+   * ============================================================ */
 
   /**
    * Citizen Signup / Registration with email & password
@@ -66,7 +67,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user in unverified state
+    // Create citizen user with isEmailVerified false until verification
     const newUser = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -90,6 +91,7 @@ export class AuthService {
         token,
         purpose: 'citizen_signup',
         expiresAt,
+        isUsed: false,
       },
     });
 
@@ -107,8 +109,8 @@ export class AuthService {
       message: 'Registration successful! Please verify your email with the verification code.',
       email: cleanEmail,
       requiresVerification: true,
-      devOtpCode: config.devAuthMode ? otpCode : undefined,
-      devVerificationToken: config.devAuthMode ? token : undefined,
+      devOtpCode: otpCode,
+      devVerificationToken: token,
     };
   }
 
@@ -401,9 +403,10 @@ export class AuthService {
     };
   }
 
-  // -------------------------------------------------------------
-  // 3. WORKER AUTHENTICATION & ACTIVATION
-  // -------------------------------------------------------------
+  /* ============================================================
+   * MODULE 3: Worker Authentication & Account Activation
+   * Handles worker password login, activation token verification, and session creation
+   * ============================================================ */
 
   /**
    * Worker Login with Worker ID or registered work email + Password
@@ -415,7 +418,7 @@ export class AuthService {
 
     const cleanIdentifier = workerIdOrEmail.trim();
 
-    // Find worker profile by workerId or user email
+    // Find worker profile strictly by Worker ID (e.g. WRK-NSK-101) or registered work email
     const workerProfile = await prisma.workerProfile.findFirst({
       where: {
         OR: [
@@ -430,20 +433,26 @@ export class AuthService {
     });
 
     if (!workerProfile) {
-      throw new Error('Invalid worker credentials.');
+      throw new Error('Invalid worker credentials. Please verify your Worker ID or registered work email.');
     }
 
     if (workerProfile.status !== 'active' || workerProfile.user.status !== 'active') {
       throw new Error('Worker account is inactive or revoked. Please contact your supervisor.');
     }
 
-    if (!workerProfile.isActivated || !workerProfile.user.password) {
-      throw new Error('Worker account has not been activated. Please use the activation screen to set your password.');
+    // Enforce account activation check
+    if (!workerProfile.isActivated) {
+      throw new Error('Your worker account has not been activated. Please activate your account using your supervisor-issued activation token.');
     }
 
+    if (!workerProfile.user.password) {
+      throw new Error('No password configured for this worker. Please activate your account using your invitation token.');
+    }
+
+    // Verify password strictly with bcrypt
     const isMatch = await bcrypt.compare(password, workerProfile.user.password);
     if (!isMatch) {
-      throw new Error('Invalid worker credentials.');
+      throw new Error('Invalid worker credentials. Please check your password.');
     }
 
     await logAuditEvent({

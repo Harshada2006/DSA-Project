@@ -2,17 +2,17 @@ import { prisma } from '../database/client.js';
 import { executeCppEngine } from '../engine/cppSubprocess.js';
 
 export class DsaService {
-  /**
-   * Health status of compiled C++ engine
-   */
+  /* ============================================================
+   * MODULE 1: C++ Native Engine Health Check
+   * ============================================================ */
   async getEngineHealth() {
     return await executeCppEngine('health');
   }
 
-  /**
-   * Run 4-factor collection priority ranking
+  /* ============================================================
+   * MODULE 2: Multi-Factor Priority Bin Dispatch Calculation
    * (Overflow 40%, Pickup Delay 25%, Sensitive Location 20%, Missed Pickups 15%)
-   */
+   * ============================================================ */
   async getPrioritizedTasks(options = {}) {
     const where = { status: { in: ['active', 'full'] } };
     if (options.wardId) where.wardId = options.wardId;
@@ -99,9 +99,9 @@ export class DsaService {
     };
   }
 
-  /**
-   * Shortest path with dynamic roadblock avoidance
-   */
+  /* ============================================================
+   * MODULE 3: Dijkstra Shortest Path with Dynamic Roadblock Avoidance
+   * ============================================================ */
   async getShortestPath(sourceId, targetId, useTime = false, avoidBlocked = true) {
     const nodes = await prisma.roadNode.findMany();
     const edgeFilter = avoidBlocked ? { isBlocked: false } : {};
@@ -145,9 +145,9 @@ export class DsaService {
     return cppRes.data;
   }
 
-  /**
-   * Multi-Stop Route Optimizer with Dynamic Roadblock Rerouting
-   */
+  /* ============================================================
+   * MODULE 4: Multi-Stop Route Optimizer & Rerouting
+   * ============================================================ */
   async getOptimizedRoute(request) {
     const nodes = await prisma.roadNode.findMany();
 

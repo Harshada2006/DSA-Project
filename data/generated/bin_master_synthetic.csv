@@ -1,0 +1,101 @@
+Bin_ID,Area,Ward_Code,Bin_Name,Bin_Type,Area_Category,Capacity_Litres,Latitude,Longitude,Location_Verification_Status,Data_Source
+BIN-NSK-001,Panchavati,WARD-01,Panchavati Ghat Steps / Riverbank Hub #1,general,pilgrimage,1200,20.0067,73.8006,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-002,Panchavati,WARD-01,Panchavati Housing Colony Transit Point #2,general,residential,2000,20.0088,73.8015,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-003,Panchavati,WARD-01,Panchavati Shopping Arcade / Corner #3,general,commercial,660,20.0049,73.7995,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-004,Panchavati,WARD-01,Panchavati Vegetable Market Cluster #4,general,market,1200,20.0038,73.7992,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-005,Panchavati,WARD-01,Panchavati Ghat Steps / Riverbank Hub #5,general,pilgrimage,2000,20.0092,73.7956,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-006,Panchavati,WARD-01,Panchavati Housing Colony Transit Point #6,general,residential,660,20.0042,73.8036,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-007,Panchavati,WARD-01,Panchavati Shopping Arcade / Corner #7,general,commercial,1200,20.0124,73.8,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-008,Panchavati,WARD-01,Panchavati Vegetable Market Cluster #8,general,market,2000,20.015,73.7954,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-009,Panchavati,WARD-01,Panchavati Ghat Steps / Riverbank Hub #9,general,pilgrimage,660,20.0017,73.7923,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-010,Panchavati,WARD-01,Panchavati Housing Colony Transit Point #10,general,residential,1200,20.0027,73.7901,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-011,Panchavati,WARD-01,Panchavati Shopping Arcade / Corner #11,general,commercial,2000,20.0059,73.797,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-012,Panchavati,WARD-01,Panchavati Vegetable Market Cluster #12,general,market,660,20.0021,73.8021,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-013,Panchavati,WARD-01,Panchavati Ghat Steps / Riverbank Hub #13,general,pilgrimage,1200,20.0133,73.7969,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-014,Panchavati,WARD-01,Panchavati Housing Colony Transit Point #14,general,residential,2000,20.0008,73.7878,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-015,Panchavati,WARD-01,Panchavati Shopping Arcade / Corner #15,general,commercial,660,20.0103,73.7931,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-016,Panchavati,WARD-01,Panchavati Vegetable Market Cluster #16,general,market,1200,20.0097,73.8021,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-017,Panchavati,WARD-01,Panchavati Ghat Steps / Riverbank Hub #17,general,pilgrimage,2000,20.0045,73.8,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-018,Panchavati,WARD-01,Panchavati Housing Colony Transit Point #18,general,residential,660,20.0144,73.7965,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-019,Panchavati,WARD-01,Panchavati Shopping Arcade / Corner #19,general,commercial,1200,20.008,73.7988,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-020,Panchavati,WARD-01,Panchavati Vegetable Market Cluster #20,general,market,2000,20.0088,73.7971,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-021,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #1,general,residential,2000,19.9992,73.7698,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-022,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #2,general,market,660,20.0005,73.7653,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-023,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #3,general,commercial,1200,19.9958,73.7778,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-024,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #4,general,residential,2000,19.995,73.7653,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-025,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #5,general,market,660,19.9959,73.7758,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-026,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #6,general,commercial,1200,20.0021,73.7684,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-027,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #7,general,residential,2000,19.9925,73.7748,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-028,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #8,general,market,660,20.0055,73.7828,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-029,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #9,general,commercial,1200,19.9948,73.7731,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-030,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #10,general,residential,2000,20.001,73.7734,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-031,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #11,general,market,660,20.0005,73.7795,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-032,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #12,general,commercial,1200,19.9902,73.7802,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-033,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #13,general,residential,2000,20.0048,73.7771,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-034,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #14,general,market,660,19.9905,73.7828,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-035,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #15,general,commercial,1200,19.9976,73.7708,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-036,Nashik West,WARD-02,Nashik West Housing Colony Transit Point #16,general,residential,2000,19.9923,73.7808,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-037,Nashik West,WARD-02,Nashik West Vegetable Market Cluster #17,general,market,660,19.9928,73.768,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-038,Nashik West,WARD-02,Nashik West Shopping Arcade / Corner #18,general,commercial,1200,19.9901,73.7805,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-039,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #1,recyclable,residential,2000,19.9874,73.7959,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-040,Nashik East,WARD-03,Nashik East Vegetable Market Cluster #2,recyclable,market,660,19.9999,73.7914,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-041,Nashik East,WARD-03,Nashik East Shopping Arcade / Corner #3,recyclable,commercial,1200,19.986,73.7935,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-042,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #4,recyclable,residential,2000,19.9951,73.7838,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-043,Nashik East,WARD-03,Nashik East Vegetable Market Cluster #5,recyclable,market,660,19.992,73.7938,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-044,Nashik East,WARD-03,Nashik East Shopping Arcade / Corner #6,recyclable,commercial,1200,19.9973,73.7976,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-045,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #7,recyclable,residential,2000,19.987,73.7936,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-046,Nashik East,WARD-03,Nashik East Vegetable Market Cluster #8,recyclable,market,660,19.9909,73.7946,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-047,Nashik East,WARD-03,Nashik East Shopping Arcade / Corner #9,recyclable,commercial,1200,19.9896,73.7942,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-048,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #10,recyclable,residential,2000,19.986,73.7923,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-049,Nashik East,WARD-03,Nashik East Vegetable Market Cluster #11,recyclable,market,660,19.9916,73.7951,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-050,Nashik East,WARD-03,Nashik East Shopping Arcade / Corner #12,recyclable,commercial,1200,19.9864,73.7945,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-051,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #13,recyclable,residential,2000,19.9928,73.7989,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-052,Nashik East,WARD-03,Nashik East Vegetable Market Cluster #14,recyclable,market,660,19.9988,73.7866,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-053,Nashik East,WARD-03,Nashik East Shopping Arcade / Corner #15,recyclable,commercial,1200,19.9864,73.791,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-054,Nashik East,WARD-03,Nashik East Housing Colony Transit Point #16,recyclable,residential,2000,19.9968,73.7896,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-055,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #1,recyclable,commercial,1200,19.9676,73.7598,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-056,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #2,recyclable,market,2000,19.9592,73.7461,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-057,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #3,recyclable,residential,660,19.9676,73.746,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-058,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #4,recyclable,commercial,1200,19.9608,73.753,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-059,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #5,recyclable,market,2000,19.9614,73.7491,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-060,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #6,recyclable,residential,660,19.9696,73.7487,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-061,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #7,recyclable,commercial,1200,19.9605,73.7547,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-062,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #8,recyclable,market,2000,19.9599,73.7501,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-063,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #9,recyclable,residential,660,19.9708,73.7463,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-064,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #10,recyclable,commercial,1200,19.9717,73.7508,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-065,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #11,recyclable,market,2000,19.9697,73.7619,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-066,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #12,recyclable,residential,660,19.9586,73.7571,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-067,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #13,recyclable,commercial,1200,19.9685,73.7505,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-068,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #14,recyclable,market,2000,19.9694,73.7616,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-069,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #15,recyclable,residential,660,19.9629,73.7476,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-070,CIDCO,WARD-04,CIDCO Shopping Arcade / Corner #16,recyclable,commercial,1200,19.9627,73.7622,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-071,CIDCO,WARD-04,CIDCO Vegetable Market Cluster #17,recyclable,market,2000,19.9631,73.7476,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-072,CIDCO,WARD-04,CIDCO Housing Colony Transit Point #18,recyclable,residential,660,19.9579,73.7552,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-073,Satpur,WARD-05,Satpur Housing Colony Transit Point #1,general,residential,1200,19.9805,73.7228,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-074,Satpur,WARD-05,Satpur Shopping Arcade / Corner #2,general,commercial,2000,19.9834,73.7356,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-075,Satpur,WARD-05,Satpur MIDC Gate / Industrial Shed #3,general,industrial,660,19.978,73.7356,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-076,Satpur,WARD-05,Satpur Housing Colony Transit Point #4,general,residential,1200,19.9757,73.7328,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-077,Satpur,WARD-05,Satpur Shopping Arcade / Corner #5,general,commercial,2000,19.9748,73.7316,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-078,Satpur,WARD-05,Satpur MIDC Gate / Industrial Shed #6,general,industrial,660,19.9741,73.7242,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-079,Satpur,WARD-05,Satpur Housing Colony Transit Point #7,general,residential,1200,19.9803,73.7363,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-080,Satpur,WARD-05,Satpur Shopping Arcade / Corner #8,general,commercial,2000,19.9867,73.7267,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-081,Satpur,WARD-05,Satpur MIDC Gate / Industrial Shed #9,general,industrial,660,19.9832,73.7309,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-082,Satpur,WARD-05,Satpur Housing Colony Transit Point #10,general,residential,1200,19.9791,73.7266,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-083,Satpur,WARD-05,Satpur Shopping Arcade / Corner #11,general,commercial,2000,19.9886,73.7239,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-084,Satpur,WARD-05,Satpur MIDC Gate / Industrial Shed #12,general,industrial,660,19.9846,73.7384,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-085,Satpur,WARD-05,Satpur Housing Colony Transit Point #13,general,residential,1200,19.9806,73.7323,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-086,Satpur,WARD-05,Satpur Shopping Arcade / Corner #14,general,commercial,2000,19.9891,73.7324,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-087,Nashik Road,WARD-06,Nashik Road Housing Colony Transit Point #1,recyclable,residential,2000,19.9562,73.8388,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-088,Nashik Road,WARD-06,Nashik Road Vegetable Market Cluster #2,recyclable,market,660,19.9453,73.8294,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-089,Nashik Road,WARD-06,Nashik Road Shopping Arcade / Corner #3,recyclable,commercial,1200,19.9569,73.8404,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-090,Nashik Road,WARD-06,Nashik Road Housing Colony Transit Point #4,recyclable,residential,2000,19.9502,73.8312,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-091,Nashik Road,WARD-06,Nashik Road Vegetable Market Cluster #5,recyclable,market,660,19.9462,73.8402,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-092,Nashik Road,WARD-06,Nashik Road Shopping Arcade / Corner #6,recyclable,commercial,1200,19.9534,73.8245,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-093,Nashik Road,WARD-06,Nashik Road Housing Colony Transit Point #7,recyclable,residential,2000,19.9519,73.834,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-094,Nashik Road,WARD-06,Nashik Road Vegetable Market Cluster #8,recyclable,market,660,19.9576,73.8259,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-095,Nashik Road,WARD-06,Nashik Road Shopping Arcade / Corner #9,recyclable,commercial,1200,19.9592,73.829,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-096,Nashik Road,WARD-06,Nashik Road Housing Colony Transit Point #10,recyclable,residential,2000,19.9483,73.8274,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-097,Nashik Road,WARD-06,Nashik Road Vegetable Market Cluster #11,recyclable,market,660,19.9557,73.8365,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-098,Nashik Road,WARD-06,Nashik Road Shopping Arcade / Corner #12,recyclable,commercial,1200,19.9565,73.8343,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-099,Nashik Road,WARD-06,Nashik Road Housing Colony Transit Point #13,recyclable,residential,2000,19.9546,73.827,approximate_synthetic,SYNTHETIC_SIMULATION
+BIN-NSK-100,Nashik Road,WARD-06,Nashik Road Vegetable Market Cluster #14,recyclable,market,660,19.9456,73.8279,approximate_synthetic,SYNTHETIC_SIMULATION
