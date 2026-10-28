@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
+import { LanguageProvider } from './context/LanguageContext.jsx';
 import { ProtectedRoute } from './components/common/ProtectedRoute.jsx';
 import { AdminLayout } from './components/layout/AdminLayout.jsx';
 
@@ -21,81 +23,86 @@ import { OverviewPage } from './pages/OverviewPage.jsx';
 import { BinsPage } from './pages/BinsPage.jsx';
 import { LiveMapPage } from './pages/LiveMapPage.jsx';
 import { PrioritizedTasksPage } from './pages/PrioritizedTasksPage.jsx';
-import { RouteOptimizationPage } from './pages/RouteOptimizationPage.jsx';
 import { TasksPage } from './pages/TasksPage.jsx';
 import { WorkersPage } from './pages/WorkersPage.jsx';
 import { ComplaintsPage } from './pages/ComplaintsPage.jsx';
 import { EWastePage } from './pages/EWastePage.jsx';
 import { FacilitiesPage } from './pages/FacilitiesPage.jsx';
-import { SchedulesPage } from './pages/SchedulesPage.jsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.jsx';
-import { DataSourcesPage } from './pages/DataSourcesPage.jsx';
 
 export const App = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Landing & Portals */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/citizen/login" element={<CitizenAuthPage />} />
-          <Route path="/worker/login" element={<WorkerAuthPage />} />
-          <Route path="/organization/login" element={<OrganizationAuthPage />} />
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public Landing & Portals */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/citizen/login" element={<CitizenAuthPage />} />
+              <Route path="/worker/login" element={<WorkerAuthPage />} />
+              <Route path="/organization/login" element={<OrganizationAuthPage />} />
 
-          {/* Citizen Dedicated Protected Portal */}
-          <Route
-            path="/citizen/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['CITIZEN']}>
-                <CitizenDashboard />
-              </ProtectedRoute>
-            }
-          />
+              {/* Citizen Dedicated Protected Portal */}
+              <Route
+                path="/citizen/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['CITIZEN']}>
+                    <CitizenDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Worker Dedicated Protected Field Portal */}
-          <Route
-            path="/worker/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['WORKER']}>
-                <WorkerDashboard />
-              </ProtectedRoute>
-            }
-          />
+              {/* Worker Dedicated Protected Field Portal */}
+              <Route
+                path="/worker/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['WORKER']}>
+                    <WorkerDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Organization Admin Protected Portal */}
-          <Route
-            path="/organization"
-            element={
-              <ProtectedRoute allowedRoles={['ORGANIZATION_ADMIN']}>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/organization/overview" replace />} />
-            <Route path="overview" element={<OverviewPage />} />
-            <Route path="dashboard" element={<Navigate to="/organization/overview" replace />} />
-            <Route path="bins" element={<BinsPage />} />
-            <Route path="map" element={<LiveMapPage />} />
-            <Route path="live-map" element={<Navigate to="/organization/map" replace />} />
-            <Route path="prioritized-tasks" element={<PrioritizedTasksPage />} />
-            <Route path="tasks-priority" element={<Navigate to="/organization/prioritized-tasks" replace />} />
-            <Route path="route-optimization" element={<RouteOptimizationPage />} />
-            <Route path="routes" element={<Navigate to="/organization/route-optimization" replace />} />
-            <Route path="tasks" element={<TasksPage />} />
-            <Route path="workers" element={<WorkersPage />} />
-            <Route path="complaints" element={<ComplaintsPage />} />
-            <Route path="ewaste" element={<EWastePage />} />
-            <Route path="facilities" element={<FacilitiesPage />} />
-            <Route path="schedules" element={<SchedulesPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="data-sources" element={<DataSourcesPage />} />
-          </Route>
+              {/* Organization Admin Protected Portal */}
+              <Route
+                path="/organization"
+                element={
+                  <ProtectedRoute allowedRoles={['ORGANIZATION_ADMIN']}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/organization/overview" replace />} />
+                <Route path="overview" element={<OverviewPage />} />
+                <Route path="dashboard" element={<Navigate to="/organization/overview" replace />} />
+                <Route path="bins" element={<BinsPage />} />
+                <Route path="map" element={<LiveMapPage />} />
+                <Route path="live-map" element={<Navigate to="/organization/map" replace />} />
+                <Route path="prioritized-tasks" element={<PrioritizedTasksPage />} />
+                <Route path="tasks-priority" element={<Navigate to="/organization/prioritized-tasks" replace />} />
+                <Route path="tasks" element={<TasksPage />} />
+                <Route path="workers" element={<WorkersPage />} />
+                <Route path="complaints" element={<ComplaintsPage />} />
+                <Route path="ewaste" element={<EWastePage />} />
+                <Route path="facilities" element={<FacilitiesPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+                {/* Redirects for removed modules */}
+                <Route path="issues" element={<Navigate to="/organization/overview" replace />} />
+                <Route path="roadblocks" element={<Navigate to="/organization/overview" replace />} />
+                <Route path="route-optimization" element={<Navigate to="/organization/tasks" replace />} />
+                <Route path="routes" element={<Navigate to="/organization/tasks" replace />} />
+                <Route path="schedules" element={<Navigate to="/organization/overview" replace />} />
+                <Route path="data-sources" element={<Navigate to="/organization/overview" replace />} />
+              </Route>
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 };
 

@@ -4,7 +4,7 @@ import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { Modal } from '../components/common/Modal.jsx';
-import { ProvenanceBadge } from '../components/common/ProvenanceBadge.jsx';
+import { SearchInput } from '../components/common/SearchInput.jsx';
 import {
   Clock,
   CheckCircle2,
@@ -24,6 +24,7 @@ export const TasksPage = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -79,12 +80,24 @@ export const TasksPage = () => {
 
   const getStatusBadge = (status) => {
     const s = (status || '').toUpperCase();
-    if (s === 'COMPLETED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">Completed</span>;
-    if (s === 'IN_PROGRESS' || s === 'STARTED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">In Progress</span>;
-    if (s === 'ASSIGNED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300">Assigned</span>;
-    if (s === 'MISSED' || s === 'BLOCKED') return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">{s}</span>;
-    return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">Pending</span>;
+    if (s === 'COMPLETED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">Completed</span>;
+    if (s === 'IN_PROGRESS' || s === 'STARTED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">In Progress</span>;
+    if (s === 'ASSIGNED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300">Assigned</span>;
+    if (s === 'MISSED' || s === 'BLOCKED') return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">{s}</span>;
+    return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">Pending</span>;
   };
+
+  const filteredTasks = tasks.filter((t) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      (t.id || '').toLowerCase().includes(q) ||
+      (t.bin?.code || '').toLowerCase().includes(q) ||
+      (t.bin?.name || '').toLowerCase().includes(q) ||
+      (t.worker?.user?.name || '').toLowerCase().includes(q) ||
+      (t.worker?.workerId || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -97,58 +110,63 @@ export const TasksPage = () => {
               {tasks.length} Total
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             Real-time assignment and execution log for Nashik Municipal Corporation field drivers
           </p>
         </div>
 
         <Button
           variant="primary"
-          size="sm"
+          size="md"
           onClick={() => setIsCreateOpen(true)}
-          icon={<Plus className="w-3.5 h-3.5" />}
+          icon={<Plus className="w-4 h-4" />}
         >
           Create Dispatch Task
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card className="p-4 flex flex-wrap items-center gap-4">
-        <div>
-          <label className="text-[11px] font-semibold text-slate-600 block mb-1">Status Filter</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="assigned">Assigned</option>
-            <option value="started">Started / In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="missed">Missed / Blocked</option>
-          </select>
-        </div>
+      {/* Filters with SearchInput */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onClear={() => setSearch('')}
+              placeholder="Search by Task ID, bin code, name, or assigned worker..."
+            />
+          </div>
 
-        <div>
-          <label className="text-[11px] font-semibold text-slate-600 block mb-1">Priority Tier</label>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="">All Priorities</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
-        </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="assigned">Assigned</option>
+              <option value="started">Started / In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="missed">Missed / Blocked</option>
+            </select>
 
-        <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={loadData} icon={<RefreshCw className="w-3.5 h-3.5" />}>
-            Refresh
-          </Button>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="">All Priorities</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+
+            <Button variant="outline" size="sm" onClick={loadData} icon={<RefreshCw className="w-3.5 h-3.5" />}>
+              Refresh
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -175,16 +193,16 @@ export const TasksPage = () => {
                     Loading collection tasks...
                   </td>
                 </tr>
-              ) : tasks.length === 0 ? (
+              ) : filteredTasks.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center p-8 text-slate-500">
-                    No collection tasks found. Dispatch one above or from the C++ Heap view!
+                    No collection tasks found. Dispatch one above or from the Collection Priority view!
                   </td>
                 </tr>
               ) : (
-                tasks.map((task) => (
+                filteredTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-3.5 font-mono font-bold text-slate-900">
+                    <td className="p-3.5 font-mono font-bold text-slate-900 text-xs">
                       #{task.id.slice(0, 8)}
                     </td>
                     <td className="p-3.5">
@@ -209,11 +227,13 @@ export const TasksPage = () => {
                         {task.priority}
                       </span>
                     </td>
-                    <td className="p-3.5">{getStatusBadge(task.status)}</td>
-                    <td className="p-3.5 text-slate-500 text-[11px]">
+                    <td className="p-3.5">
+                      {getStatusBadge(task.status)}
+                    </td>
+                    <td className="p-3.5 text-slate-500 font-mono whitespace-nowrap">
                       {new Date(task.createdAt).toLocaleString()}
                     </td>
-                    <td className="p-3.5 text-slate-600 text-[11px] max-w-xs truncate">
+                    <td className="p-3.5 text-slate-600 max-w-xs truncate" title={task.notes}>
                       {task.notes || '—'}
                     </td>
                   </tr>
@@ -225,70 +245,76 @@ export const TasksPage = () => {
       </Card>
 
       {/* Create Task Modal */}
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Dispatch Collection Task">
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="Dispatch New Municipal Collection Task"
+      >
         <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Select Target Bin *</label>
+            <label className="block text-slate-700 font-semibold mb-1">Target Bin Asset *</label>
             <select
               required
               value={createForm.binId}
               onChange={(e) => setCreateForm({ ...createForm, binId: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
             >
               {bins.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.code} - {b.name} ({b.ward?.name}) - {b.currentFillPercentage}% Full
+                  {b.code} - {b.name} ({b.ward?.name}) • Fill: {b.currentFillPercentage}%
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Assign Worker (Optional)</label>
-            <select
-              value={createForm.workerId}
-              onChange={(e) => setCreateForm({ ...createForm, workerId: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-            >
-              <option value="">Leave Open (First Available Worker)</option>
-              {workers.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.user?.name} ({w.workerId}) - Vehicle: {w.vehicleNumber || 'Unassigned'}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Assign Worker</label>
+              <select
+                value={createForm.workerId}
+                onChange={(e) => setCreateForm({ ...createForm, workerId: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+              >
+                <option value="">Unassigned (Open Dispatch)</option>
+                {workers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.user?.name || w.workerId} ({w.workerId})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Priority Tier</label>
+              <select
+                value={createForm.priority}
+                onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+              >
+                <option value="CRITICAL">Critical (Score 80+)</option>
+                <option value="HIGH">High (Score 60+)</option>
+                <option value="MEDIUM">Medium (Score 40+)</option>
+                <option value="LOW">Low (Score 0-39)</option>
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Priority Tier</label>
-            <select
-              value={createForm.priority}
-              onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-            >
-              <option value="CRITICAL">Critical (Immediate dispatch)</option>
-              <option value="HIGH">High (Today's shift)</option>
-              <option value="MEDIUM">Medium (Routine collection)</option>
-              <option value="LOW">Low</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Dispatch Notes</label>
-            <input
-              type="text"
+            <label className="block text-slate-700 font-semibold mb-1">Dispatcher Operational Notes</label>
+            <textarea
+              rows={2}
               value={createForm.notes}
               onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
-              placeholder="e.g. Cleared after morning religious prayer at Ramkund"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+              placeholder="e.g. Cleared for market day preparation"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs resize-none"
             />
           </div>
 
-          <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsCreateOpen(false)}>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(false)} type="button">
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={submitting}>
+            <Button variant="primary" size="sm" type="submit" isLoading={submitting}>
               Dispatch Task
             </Button>
           </div>

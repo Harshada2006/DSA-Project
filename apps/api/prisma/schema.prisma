@@ -21,6 +21,7 @@ model User {
   name            String
   role            String         @default("CITIZEN") // Exactly: ORGANIZATION_ADMIN, WORKER, CITIZEN
   status          String         @default("active")  // active, pending, disabled
+  isEmailVerified Boolean        @default(true)
   organizationId  String?
   organization    Organization?  @relation(fields: [organizationId], references: [id])
   workerProfile   WorkerProfile?
@@ -28,6 +29,7 @@ model User {
   ewasteRequests  EWasteRequest[]
   assignedTasks   CollectionTask[]
   assignedEWaste  EWasteRequest[] @relation("AssignedWorker")
+  reportedIssues  OperationalIssue[]
   auditLogs       AuditLog[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -168,6 +170,7 @@ model Bin {
   tasks                 CollectionTask[]
   routeStops            RouteStop[]
   complaints            Complaint[]
+  issues                OperationalIssue[]
 
   @@index([wardId])
   @@index([status])
@@ -213,6 +216,7 @@ model CollectionTask {
   photoEvidenceUrl   String?
   workerGpsLat       Float?
   workerGpsLng       Float?
+  issues             OperationalIssue[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -299,18 +303,29 @@ model ComplaintUpdate {
 model Facility {
   id                      String           @id @default(uuid())
   name                    String
-  facilityType            String           @default("verified_ewaste_recycler") // general_waste_facility, verified_ewaste_recycler, composting_plant, transfer_station
+  facilityType            String           @default("verified_ewaste_recycler") // general_waste_facility, verified_ewaste_recycler, ewaste_refurbisher, local_collection_point, scrap_dealer
+  wasteType               String           @default("electronic") // electronic, general, battery
   address                 String
+  businessAddress         String?
+  facilityAddress         String?
+  area                    String?
   latitude                Float
   longitude               Float
+  locationAccuracy        String?          @default("approximate_area") // approximate_area, verified_geocoded
   acceptedWasteCategories String           // JSON array string e.g. ["electronic", "battery"]
   authorizationNumber     String?          // Official MPCB authorization certificate
   authorizationValidUntil DateTime?
-  verificationStatus      String           @default("verified") // verified, pending_verification, unverified
+  verificationStatus      String           @default("pending_confirmation") // verified, pending_confirmation, unverified, expired_or_unconfirmed
+  verificationSource      String?          @default("Supplied Nashik Reference")
+  lastVerifiedAt          DateTime?
+  pickupAvailable         Boolean          @default(false)
+  publicDropoffAvailable  Boolean          @default(false)
+  activeStatus            String           @default("active")
   sourceOrganization      String           @default("Maharashtra Pollution Control Board (MPCB)")
   sourceUrl               String?
   contactPerson           String?
   contactPhone            String?
+  contactEmail            String?
   provenance              String           @default("imported")
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
@@ -527,10 +542,56 @@ model RoadEdge {
   travelTimeSeconds Float
   roadName          String
   oneWay            Boolean  @default(false)
+  isBlocked         Boolean  @default(false)
+  blockedReason     String?
+  blockedAt         DateTime?
   createdAt         DateTime @default(now())
 
   @@index([sourceNodeId])
   @@index([targetNodeId])
+  @@index([isBlocked])
+}
+
+model OperationalIssue {
+  id              String          @id @default(uuid())
+  ticketNo        String          @unique
+  issueType       String          // blocked_road, damaged_bin, inaccessible_point, unsafe_location, incorrect_map, vehicle_problem, other
+  workerId        String?
+  worker          User?           @relation(fields: [workerId], references: [id])
+  taskId          String?
+  task            CollectionTask? @relation(fields: [taskId], references: [id])
+  binId           String?
+  bin             Bin?            @relation(fields: [binId], references: [id])
+  roadEdgeId      String?
+  locationText    String?
+  latitude        Float?
+  longitude       Float?
+  description     String?
+  photoUrl        String?
+  status          String          @default("reported") // reported, investigating, active_roadblock, resolved, rejected
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([workerId])
+  @@index([issueType])
+  @@index([status])
+}
+
+model SampleWorkerRecord {
+  id               String   @id @default(uuid())
+  workerId         String   @unique
+  workerName       String
+  assignedZone     String
+  shift            String
+  vehicleType      String
+  assignedBinIds   String
+  availability     String
+  dataStatus       String
+  verificationNote String?
+  isFictional      Boolean  @default(true)
+  createdAt        DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------

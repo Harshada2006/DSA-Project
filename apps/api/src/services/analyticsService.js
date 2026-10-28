@@ -1,9 +1,10 @@
 import { prisma } from '../database/client.js';
 
 export class AnalyticsService {
-  /**
-   * Comprehensive metrics for Organization Admin Dashboard
-   */
+  /* ============================================================
+   * MODULE 1: Municipal Executive Dashboard KPI Aggregation
+   * Aggregates real-time metrics, bins, complaints, and collections
+   * ============================================================ */
   async getDashboardSummary() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -142,9 +143,10 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Export reports in CSV format
-   */
+  /* ============================================================
+   * MODULE 2: Regulatory Compliance CSV Data Export
+   * Generates downloadable CSV audits for Bins, Complaints & E-Waste
+   * ============================================================ */
   async exportReportCsv(type = 'bins') {
     if (type === 'bins') {
       const bins = await prisma.bin.findMany({ include: { ward: true } });

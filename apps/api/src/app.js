@@ -15,6 +15,7 @@ import predictionRoutes from './routes/prediction.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import wardRoutes from './routes/ward.routes.js';
+import issueRoutes from './routes/issue.routes.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/v1/predictions', predictionRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/wards', wardRoutes);
+app.use('/api/v1/issues', issueRoutes);
 
 // Global 404 Handler
 app.use((_req, res) => {

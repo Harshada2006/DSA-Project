@@ -4,18 +4,36 @@
 
 @layer base {
   html {
-    font-size: 16px;
+    font-size: 17.5px; /* Increased base font size for higher clarity and readability */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  
   body {
     @apply bg-slate-50 text-slate-900 min-h-screen font-sans text-base leading-relaxed;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Dark mode root styles when .dark is active */
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
   
-  /* Make small badges and labels easier to read */
+  /* Increased readability for small badges, labels, and table cells */
   small, .text-xs {
-    font-size: 0.8125rem; /* 13px instead of 12px */
+    font-size: 0.875rem; /* 14px instead of 12px for superior legibility */
+  }
+
+  .text-sm {
+    font-size: 0.9375rem; /* 15px */
+  }
+
+  h1 {
+    @apply font-bold text-slate-900;
+  }
+  
+  html.dark h1 {
+    @apply text-white;
   }
 }
 

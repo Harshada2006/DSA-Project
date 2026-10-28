@@ -24,7 +24,10 @@
     "test": "npm run test:cpp && npm run test:api",
     "db:migrate": "npm run --workspace=apps/api db:migrate",
     "db:push": "npm run --workspace=apps/api prisma -- db push",
-    "db:seed": "npm run --workspace=apps/api db:seed"
+    "db:seed": "npm run --workspace=apps/api db:seed",
+    "generate:dataset": "node scripts/generate_synthetic_dataset.js",
+    "validate:dataset": "node data/generated/validate_dataset.js",
+    "import:bin-history": "node scripts/import_bin_history.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -25,67 +25,117 @@ function generateOtpCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function isValidEmail(email) {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export class AuthService {
-  // -------------------------------------------------------------
-  // CITIZEN AUTHENTICATION (Passwordless OTP verification)
-  // -------------------------------------------------------------
+  /* ============================================================
+   * MODULE 1: Citizen Registration & Authentication
+   * Handles citizen password signup, auto-verification, and login
+   * ============================================================ */
 
   /**
-   * Send or create OTP for Citizen signup/login
+   * Citizen Signup / Registration with email & password
    */
-  async requestCitizenOtp(email, name = 'Nashik Resident') {
-    if (!email || !email.includes('@')) {
+  async citizenRegister(data, req) {
+    const { name, email, password, confirmPassword, agreeTerms } = data;
+
+    if (!name || !name.trim()) {
+      throw new Error('Full name is required.');
+    }
+    if (!email || !isValidEmail(email)) {
       throw new Error('A valid email address is required.');
+    }
+    if (!password || password.length < 8) {
+      throw new Error('Password must be at least 8 characters long.');
+    }
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      throw new Error('Password confirmation does not match.');
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    // Check duplicate email
+    const existing = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existing) {
+      throw new Error('An account with this email address already exists. Please sign in or reset your password.');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create citizen user with isEmailVerified false until verification
+    const newUser = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: cleanEmail,
+        password: hashedPassword,
+        role: 'CITIZEN',
+        status: 'active',
+        isEmailVerified: false,
+      },
+    });
+
+    // Generate single-use verification token / OTP
     const otpCode = generateOtpCode();
     const token = crypto.randomBytes(24).toString('hex');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-
-    // Invalidate prior unused tokens for this email
-    await prisma.emailVerificationToken.updateMany({
-      where: { email: cleanEmail, isUsed: false },
-      data: { isUsed: true },
-    });
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000); // 20 minutes expiry
 
     await prisma.emailVerificationToken.create({
       data: {
         email: cleanEmail,
         otpCode,
         token,
-        purpose: 'citizen_auth',
+        purpose: 'citizen_signup',
         expiresAt,
+        isUsed: false,
       },
     });
 
+    await logAuditEvent({
+      userId: newUser.id,
+      action: 'CITIZEN_REGISTERED',
+      resource: 'User',
+      resourceId: newUser.id,
+      details: { email: cleanEmail },
+      req,
+    });
+
     return {
-      message: 'Verification code generated. Please enter the 6-digit code to continue.',
+      success: true,
+      message: 'Registration successful! Please verify your email with the verification code.',
       email: cleanEmail,
-      expiresInMinutes: 10,
-      // For local development / academic evaluation, deliver OTP in payload if devAuthMode is enabled
-      devOtpCode: config.devAuthMode ? otpCode : undefined,
+      requiresVerification: true,
+      devOtpCode: otpCode,
+      devVerificationToken: token,
     };
   }
 
   /**
-   * Verify Citizen OTP and sign in / register
+   * Verify Citizen Email via OTP or Token
    */
-  async verifyCitizenOtp(email, otpCode, name = 'Nashik Resident', req) {
+  async verifyCitizenEmail(email, otpOrToken, req) {
+    if (!email || !otpOrToken) {
+      throw new Error('Email address and verification code are required.');
+    }
+
     const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = String(otpCode).trim();
+    const code = String(otpOrToken).trim();
 
     const record = await prisma.emailVerificationToken.findFirst({
       where: {
         email: cleanEmail,
-        otpCode: cleanOtp,
         isUsed: false,
         expiresAt: { gt: new Date() },
+        OR: [{ otpCode: code }, { token: code }],
       },
     });
 
     if (!record) {
-      throw new Error('Invalid or expired verification code. Please request a new code.');
+      throw new Error('Invalid or expired verification code. Please request a new verification code.');
     }
 
     // Mark token as used
@@ -94,35 +144,125 @@ export class AuthService {
       data: { isUsed: true },
     });
 
-    // Check if user exists or create new citizen
-    let user = await prisma.user.findUnique({
+    // Mark citizen email verified
+    const user = await prisma.user.update({
+      where: { email: cleanEmail },
+      data: { isEmailVerified: true },
+    });
+
+    await logAuditEvent({
+      userId: user.id,
+      action: 'CITIZEN_EMAIL_VERIFIED',
+      resource: 'User',
+      resourceId: user.id,
+      details: { email: cleanEmail },
+      req,
+    });
+
+    return {
+      success: true,
+      message: 'Email address verified successfully. You may now sign in with your password.',
+      email: user.email,
+    };
+  }
+
+  /**
+   * Resend Citizen Verification Code
+   */
+  async resendCitizenVerification(email) {
+    if (!email || !isValidEmail(email)) {
+      throw new Error('A valid email address is required.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+
+    if (!user) {
+      // Avoid account enumeration
+      return {
+        success: true,
+        message: 'If this email is registered and unverified, a verification code has been dispatched.',
+      };
+    }
+
+    if (user.isEmailVerified) {
+      return {
+        success: true,
+        message: 'This email is already verified. You can sign in immediately.',
+        alreadyVerified: true,
+      };
+    }
+
+    // Invalidate previous tokens
+    await prisma.emailVerificationToken.updateMany({
+      where: { email: cleanEmail, isUsed: false, purpose: 'citizen_signup' },
+      data: { isUsed: true },
+    });
+
+    const otpCode = generateOtpCode();
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        email: cleanEmail,
+        otpCode,
+        token,
+        purpose: 'citizen_signup',
+        expiresAt,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'New verification code generated.',
+      email: cleanEmail,
+      devOtpCode: config.devAuthMode ? otpCode : undefined,
+    };
+  }
+
+  /**
+   * Citizen Login with registered email and password
+   */
+  async citizenLogin(email, password, req) {
+    if (!email || !password) {
+      throw new Error('Email address and password are required.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({
       where: { email: cleanEmail },
     });
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: cleanEmail,
-          name: name.trim() || 'Nashik Resident',
-          role: 'CITIZEN',
-          status: 'active',
-        },
-      });
-
-      await logAuditEvent({
-        userId: user.id,
-        action: 'CITIZEN_REGISTERED',
-        resource: 'User',
-        resourceId: user.id,
-        details: { email: cleanEmail },
-        req,
-      });
-    } else {
-      // Ensure role is CITIZEN for this flow
-      if (user.role !== 'CITIZEN') {
-        throw new Error('This account is registered as a Worker or Admin. Please use the appropriate login portal.');
-      }
+    if (!user || user.role !== 'CITIZEN') {
+      throw new Error('Invalid email or password.');
     }
+
+    if (!user.password) {
+      throw new Error('No password set for this account. Please use password reset to establish a password.');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new Error('Invalid email or password.');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new Error('Your email address has not been verified. Please verify your email before signing in.');
+    }
+
+    if (user.status !== 'active') {
+      throw new Error('Your citizen account is currently disabled. Please contact municipal support.');
+    }
+
+    await logAuditEvent({
+      userId: user.id,
+      action: 'CITIZEN_LOGIN',
+      resource: 'User',
+      resourceId: user.id,
+      details: { email: cleanEmail },
+      req,
+    });
 
     const token = generateToken(user);
     return {
@@ -137,23 +277,153 @@ export class AuthService {
   }
 
   // -------------------------------------------------------------
-  // WORKER AUTHENTICATION & ACTIVATION
+  // 2. PASSWORD RESET (Secure single-use token, no enumeration)
   // -------------------------------------------------------------
 
   /**
-   * Worker Login with Worker ID, Org Code, and Password
+   * Request password reset code
    */
-  async workerLogin(workerIdOrEmail, orgCode, password, req) {
+  async requestPasswordReset(email, req) {
+    if (!email || !isValidEmail(email)) {
+      throw new Error('A valid email address is required.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+
+    let devOtpCode = undefined;
+
+    if (user && user.status === 'active') {
+      // Invalidate previous reset tokens
+      await prisma.emailVerificationToken.updateMany({
+        where: { email: cleanEmail, isUsed: false, purpose: 'password_reset' },
+        data: { isUsed: true },
+      });
+
+      const otpCode = generateOtpCode();
+      const token = crypto.randomBytes(24).toString('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+      await prisma.emailVerificationToken.create({
+        data: {
+          email: cleanEmail,
+          otpCode,
+          token,
+          purpose: 'password_reset',
+          expiresAt,
+        },
+      });
+
+      if (config.devAuthMode) {
+        devOtpCode = otpCode;
+      }
+
+      await logAuditEvent({
+        userId: user.id,
+        action: 'PASSWORD_RESET_REQUESTED',
+        resource: 'User',
+        resourceId: user.id,
+        details: { email: cleanEmail },
+        req,
+      });
+    }
+
+    // Generic safe response to prevent email enumeration
+    return {
+      success: true,
+      message: 'If this email address is registered, password reset instructions have been sent.',
+      email: cleanEmail,
+      devOtpCode,
+    };
+  }
+
+  /**
+   * Reset Password with valid token/code
+   */
+  async resetPassword(data, req) {
+    const { email, code, newPassword, confirmPassword } = data;
+
+    if (!email || !code || !newPassword) {
+      throw new Error('Email, verification code, and new password are required.');
+    }
+
+    if (newPassword.length < 8) {
+      throw new Error('Password must be at least 8 characters long.');
+    }
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      throw new Error('Password confirmation does not match.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = String(code).trim();
+
+    const record = await prisma.emailVerificationToken.findFirst({
+      where: {
+        email: cleanEmail,
+        purpose: 'password_reset',
+        isUsed: false,
+        expiresAt: { gt: new Date() },
+        OR: [{ otpCode: cleanCode }, { token: cleanCode }],
+      },
+    });
+
+    if (!record) {
+      throw new Error('Invalid or expired reset code. Please request a new password reset.');
+    }
+
+    // Invalidate token
+    await prisma.emailVerificationToken.update({
+      where: { id: record.id },
+      data: { isUsed: true },
+    });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const user = await prisma.user.update({
+      where: { email: cleanEmail },
+      data: {
+        password: hashedPassword,
+        isEmailVerified: true, // Resetting proves access to email
+      },
+    });
+
+    await logAuditEvent({
+      userId: user.id,
+      action: 'PASSWORD_RESET_COMPLETED',
+      resource: 'User',
+      resourceId: user.id,
+      details: { email: cleanEmail },
+      req,
+    });
+
+    return {
+      success: true,
+      message: 'Password has been successfully updated. You may now sign in with your new password.',
+    };
+  }
+
+  /* ============================================================
+   * MODULE 3: Worker Authentication & Account Activation
+   * Handles worker password login, activation token verification, and session creation
+   * ============================================================ */
+
+  /**
+   * Worker Login with Worker ID or registered work email + Password
+   */
+  async workerLogin(workerIdOrEmail, password, req) {
     if (!workerIdOrEmail || !password) {
       throw new Error('Worker ID or registered work email and password are required.');
     }
 
-    // Find worker profile by workerId or user email
-    let workerProfile = await prisma.workerProfile.findFirst({
+    const cleanIdentifier = workerIdOrEmail.trim();
+
+    // Find worker profile strictly by Worker ID (e.g. WRK-NSK-101) or registered work email
+    const workerProfile = await prisma.workerProfile.findFirst({
       where: {
         OR: [
-          { workerId: workerIdOrEmail.trim().toUpperCase() },
-          { user: { email: workerIdOrEmail.trim().toLowerCase() } },
+          { workerId: cleanIdentifier.toUpperCase() },
+          { user: { email: cleanIdentifier.toLowerCase() } },
         ],
       },
       include: {
@@ -163,24 +433,26 @@ export class AuthService {
     });
 
     if (!workerProfile) {
-      throw new Error('Invalid worker credentials or organization association.');
-    }
-
-    if (orgCode && workerProfile.orgCode !== orgCode.trim().toUpperCase()) {
-      throw new Error('Organization code does not match registered worker credentials.');
+      throw new Error('Invalid worker credentials. Please verify your Worker ID or registered work email.');
     }
 
     if (workerProfile.status !== 'active' || workerProfile.user.status !== 'active') {
       throw new Error('Worker account is inactive or revoked. Please contact your supervisor.');
     }
 
-    if (!workerProfile.isActivated || !workerProfile.user.password) {
-      throw new Error('Worker account has not been activated. Please use the activation screen to set your password.');
+    // Enforce account activation check
+    if (!workerProfile.isActivated) {
+      throw new Error('Your worker account has not been activated. Please activate your account using your supervisor-issued activation token.');
     }
 
+    if (!workerProfile.user.password) {
+      throw new Error('No password configured for this worker. Please activate your account using your invitation token.');
+    }
+
+    // Verify password strictly with bcrypt
     const isMatch = await bcrypt.compare(password, workerProfile.user.password);
     if (!isMatch) {
-      throw new Error('Invalid worker credentials or password.');
+      throw new Error('Invalid worker credentials. Please check your password.');
     }
 
     await logAuditEvent({
@@ -201,7 +473,7 @@ export class AuthService {
         role: 'WORKER',
         workerId: workerProfile.workerId,
         orgCode: workerProfile.orgCode,
-        organizationName: workerProfile.organization.name,
+        organizationName: workerProfile.organization?.name || 'Nashik Municipal Corporation',
         assignedWard: workerProfile.assignedWard,
         vehicleType: workerProfile.vehicleType,
       },
@@ -211,26 +483,42 @@ export class AuthService {
   /**
    * Worker Account Activation (Sets initial password via admin-issued token)
    */
-  async activateWorkerAccount(workerId, activationToken, newPassword, req) {
+  async activateWorkerAccount(data, req) {
+    const { workerId, activationToken, newPassword, confirmPassword } = data;
+
     if (!workerId || !activationToken || !newPassword) {
-      throw new Error('Worker ID, activation token, and new password are required.');
+      throw new Error('Worker ID or work email, activation token, and new password are required.');
     }
 
     if (newPassword.length < 8) {
       throw new Error('Password must be at least 8 characters long.');
     }
 
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      throw new Error('Password confirmation does not match.');
+    }
+
+    const cleanWorkerId = workerId.trim();
+    const cleanToken = activationToken.trim();
+
     const workerProfile = await prisma.workerProfile.findFirst({
       where: {
-        workerId: workerId.trim().toUpperCase(),
-        activationToken: activationToken.trim(),
+        OR: [
+          { workerId: cleanWorkerId.toUpperCase() },
+          { user: { email: cleanWorkerId.toLowerCase() } },
+        ],
+        activationToken: cleanToken,
         activationTokenExpiresAt: { gt: new Date() },
       },
       include: { user: true },
     });
 
     if (!workerProfile) {
-      throw new Error('Invalid or expired worker activation token.');
+      throw new Error('Invalid, already-used, or expired worker activation token.');
+    }
+
+    if (workerProfile.isActivated) {
+      throw new Error('Worker account is already activated. Please use the Worker Sign In screen.');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -239,7 +527,10 @@ export class AuthService {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: workerProfile.userId },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          isEmailVerified: true,
+        },
       }),
       prisma.workerProfile.update({
         where: { id: workerProfile.id },
@@ -260,17 +551,18 @@ export class AuthService {
     });
 
     return {
-      message: 'Worker account successfully activated. You may now sign in with your credentials.',
+      success: true,
+      message: 'Worker account successfully activated! You may now sign in with your Worker ID and password.',
       workerId: workerProfile.workerId,
     };
   }
 
   // -------------------------------------------------------------
-  // ORGANIZATION ADMIN AUTHENTICATION & ONBOARDING
+  // 4. ORGANIZATION ADMIN AUTHENTICATION & ACCESS REQUEST
   // -------------------------------------------------------------
 
   /**
-   * Request Organization Registration (Pending Admin Approval)
+   * Request Organization Access (Stays pending for municipal review)
    */
   async requestOrganizationRegistration(data, req) {
     const {
@@ -287,25 +579,32 @@ export class AuthService {
       throw new Error('All required organization onboarding fields must be provided.');
     }
 
+    if (!isValidEmail(officialWorkEmail)) {
+      throw new Error('A valid official work email address is required.');
+    }
+
+    const cleanEmail = officialWorkEmail.trim().toLowerCase();
+    const cleanOrgName = organizationName.trim();
+
     // Check if organization already exists
     const existingOrg = await prisma.organization.findFirst({
       where: {
         OR: [
-          { name: organizationName.trim() },
-          { officialEmail: officialWorkEmail.trim().toLowerCase() },
+          { name: cleanOrgName },
+          { officialEmail: cleanEmail },
         ],
       },
     });
 
     if (existingOrg) {
-      throw new Error('An organization with this name or official email already exists.');
+      throw new Error('An organization with this name or official work email already exists.');
     }
 
     const regRequest = await prisma.organizationRegistrationRequest.create({
       data: {
-        organizationName: organizationName.trim(),
+        organizationName: cleanOrgName,
         organizationType: organizationType || 'authorized_contractor',
-        officialWorkEmail: officialWorkEmail.trim().toLowerCase(),
+        officialWorkEmail: cleanEmail,
         adminName: adminName.trim(),
         contactPhone: contactPhone.trim(),
         verificationDetails: verificationDetails || null,
@@ -318,12 +617,13 @@ export class AuthService {
       action: 'ORG_REGISTRATION_REQUESTED',
       resource: 'OrganizationRegistrationRequest',
       resourceId: regRequest.id,
-      details: { organizationName, officialWorkEmail },
+      details: { organizationName: cleanOrgName, officialWorkEmail: cleanEmail },
       req,
     });
 
     return {
-      message: 'Organization registration request submitted for municipal verification. You will be notified upon review.',
+      success: true,
+      message: 'Organization access request submitted. Your application is pending review by authorized administrators.',
       requestId: regRequest.id,
       status: 'pending',
     };
@@ -343,12 +643,8 @@ export class AuthService {
       include: { organization: true },
     });
 
-    if (!user) {
+    if (!user || user.role !== 'ORGANIZATION_ADMIN') {
       throw new Error('Invalid administrative credentials.');
-    }
-
-    if (user.role !== 'ORGANIZATION_ADMIN') {
-      throw new Error('Access denied: This portal is reserved for authorized Organization Administrators.');
     }
 
     if (user.status !== 'active') {
@@ -388,11 +684,11 @@ export class AuthService {
   }
 
   // -------------------------------------------------------------
-  // WORKER PROVISIONING (Admin Only)
+  // 5. WORKER PROVISIONING (Admin Only)
   // -------------------------------------------------------------
 
   /**
-   * Provision a new worker record with Worker ID & Activation Token
+   * Provision worker and issue activation token
    */
   async provisionWorker(adminUser, workerData, req) {
     const { name, email, phone, assignedWard, vehicleType } = workerData;
@@ -403,17 +699,14 @@ export class AuthService {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check duplicate email
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
       throw new Error('A user account with this email already exists.');
     }
 
-    // Determine organization ID
     const orgId = adminUser.organizationId || (await prisma.organization.findFirst())?.id;
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
 
-    // Generate unique Worker ID: WRK-NSK-XXX
     const workerCount = await prisma.workerProfile.count();
     const workerId = `WRK-NSK-${101 + workerCount}`;
     const activationToken = crypto.randomBytes(16).toString('hex');
@@ -425,6 +718,7 @@ export class AuthService {
         name: name.trim(),
         role: 'WORKER',
         status: 'active',
+        isEmailVerified: true,
         organizationId: orgId,
         workerProfile: {
           create: {
@@ -454,7 +748,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Worker provisioned successfully.',
+      message: 'Worker provisioned successfully. Send the activation token to the worker.',
       worker: {
         id: newUser.id,
         workerId: newUser.workerProfile.workerId,
@@ -462,21 +756,18 @@ export class AuthService {
         email: newUser.email,
         orgCode: newUser.workerProfile.orgCode,
         assignedWard: newUser.workerProfile.assignedWard,
-        activationToken, // Provided to admin to convey to worker
+        activationToken,
         activationExpiry: tokenExpiry,
       },
     };
   }
 
-  /**
-   * List all provisioned workers in organization
-   */
   async listWorkers(orgId) {
     const where = orgId ? { organizationId: orgId } : {};
     return await prisma.workerProfile.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, email: true, status: true } },
+        user: { select: { id: true, name: true, email: true, status: true, isEmailVerified: true } },
         organization: { select: { id: true, name: true, code: true } },
       },
       orderBy: { createdAt: 'desc' },

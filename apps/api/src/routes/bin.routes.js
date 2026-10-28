@@ -24,6 +24,16 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Public / Authenticated: Get Bin historical timeseries and observations
+router.get('/:id/history', async (req, res) => {
+  try {
+    const history = await binService.getBinHistory(req.params.id, req.query);
+    res.json({ success: true, data: history });
+  } catch (err) {
+    res.status(404).json({ success: false, error: err.message });
+  }
+});
+
 // Admin Only: Create new bin
 router.post('/', authenticate, authorize('ORGANIZATION_ADMIN'), async (req, res) => {
   try {

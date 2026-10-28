@@ -1,8 +1,68 @@
 import { prisma } from '../database/client.js';
+import { BinPredictor } from '@eco-collect/ml';
+import { datasetService } from './datasetService.js';
+
+let activePredictor = null;
+
+async function getOrInitPredictor() {
+  if (activePredictor && activePredictor.isReady()) {
+    return activePredictor;
+  }
+
+  // Load active model from DB
+  let modelRecord = await prisma.mLModelRecord.findFirst({
+    where: { isActive: true },
+    orderBy: { trainedAt: 'desc' },
+  });
+
+  if (!modelRecord || !modelRecord.weightsJson) {
+    try {
+      console.log('⚡ Initializing and training ML model from 180-day bin timeseries...');
+      const trainRes = await datasetService.trainAndPersistModel();
+      modelRecord = trainRes.model;
+    } catch (err) {
+      console.warn('⚠️ Could not train model from CSV:', err.message);
+    }
+  }
+
+  if (modelRecord && modelRecord.weightsJson) {
+    try {
+      const weights = JSON.parse(modelRecord.weightsJson);
+      activePredictor = new BinPredictor(weights, {
+        version: modelRecord.version,
+        testMae: modelRecord.testMae,
+        testRmse: modelRecord.testRmse,
+      });
+      return activePredictor;
+    } catch (e) {
+      console.error('Failed to parse model weights:', e);
+    }
+  }
+
+  // Fallback predictor with default trained Ridge weights
+  activePredictor = new BinPredictor([
+    5.2,  // bias
+    68.5, // current fill
+    12.4, // prev fill
+    8.2,  // days since collection
+    -2.1, // capacity
+    14.6, // daily increase
+    2.8,  // is_weekend
+    1.5,  // day_of_week
+    3.0,  // residential
+    7.5,  // commercial
+    11.2, // market
+    1.2,  // industrial
+    8.8   // pilgrimage
+  ], { version: 'v1.0-default-nashik' });
+
+  return activePredictor;
+}
 
 export class PredictionService {
   /**
-   * Calculate sensor-free fullness estimate for a bin
+   * Predict future expected fill level and overflow risk for a specific bin
+   * (Does NOT pretend to be live physical measurement)
    */
   async predictBinFullness(binId) {
     const bin = await prisma.bin.findUnique({
@@ -18,113 +78,75 @@ export class PredictionService {
 
     if (!bin) throw new Error('Bin not found');
 
+    const predictor = await getOrInitPredictor();
+
     const now = new Date();
-
-    // Check if any active festival/event affects this bin or area
-    const activeEvents = await prisma.festivalEvent.findMany({
-      where: {
-        startDate: { lte: now },
-        endDate: { gte: now },
-      },
-    });
-
-    let demandMultiplier = 1.0;
-    let eventNameApplied = null;
-    if (activeEvents.length > 0) {
-      // Find event matching ward or citywide
-      const matchingEvent = activeEvents.find(
-        (e) => e.affectedLocation.includes(bin.ward.name) || e.affectedLocation.includes('All Nashik') || e.affectedLocation.includes(bin.areaCategory)
-      ) || activeEvents[0];
-
-      if (matchingEvent) {
-        demandMultiplier = matchingEvent.demandMultiplier;
-        eventNameApplied = matchingEvent.eventName;
-      }
+    let hoursSinceCollection = 24.0;
+    if (bin.lastCollectedAt) {
+      hoursSinceCollection = Math.max(0.0, (now.getTime() - new Date(bin.lastCollectedAt).getTime()) / 3600000);
     }
+    const daysSinceCollection = Math.floor(hoursSinceCollection / 24);
 
-    // Default hourly rate per area category (% per hour)
-    let baseHourlyRate = 0.75; // Residential: ~18% per day
-    if (bin.areaCategory === 'market') baseHourlyRate = 1.8; // Market: ~43% per day
-    else if (bin.areaCategory === 'pilgrimage') baseHourlyRate = 1.5; // Pilgrimage: ~36% per day
-    else if (bin.areaCategory === 'commercial') baseHourlyRate = 1.2; // Commercial: ~29% per day
-    else if (bin.areaCategory === 'industrial') baseHourlyRate = 0.5;
+    const lastObs = bin.observations[0];
+    const prevObs = bin.observations[1];
 
-    // Apply event planning assumption multiplier
-    const effectiveHourlyRate = baseHourlyRate * demandMultiplier;
+    const currentFill = lastObs ? lastObs.fillPercentage : bin.currentFillPercentage;
+    const prevFill = prevObs ? prevObs.fillPercentage : Math.max(0, currentFill - 10);
 
-    // Check observation availability
-    const lastObservation = bin.observations[0];
-    if (!lastObservation) {
-      return {
-        binId: bin.id,
-        binCode: bin.code,
-        binName: bin.name,
-        wardName: bin.ward.name,
-        currentFillPercentage: bin.currentFillPercentage,
-        estimatedCurrentFullness: bin.currentFillPercentage,
-        lastObservedFullness: null,
-        observationAgeHours: null,
-        observationDisplay: 'No recorded observations (Insufficient data)',
-        confidenceLevel: 'Unknown',
-        confidenceScore: 0.1,
-        predictionMethod: 'Baseline Area Default Rate',
-        eventMultiplierApplied: demandMultiplier,
-        activeEventName: eventNameApplied,
-        isPlanningAssumption: activeEvents.length > 0,
-        explanation: 'Insufficient historical observation data. Showing baseline estimate.',
-      };
-    }
+    const observationAgeHours = lastObs
+      ? Math.max(0.0, (now.getTime() - new Date(lastObs.observedAt).getTime()) / 3600000)
+      : (bin.lastObservedAt ? Math.max(0.0, (now.getTime() - new Date(bin.lastObservedAt).getTime()) / 3600000) : 12.0);
 
-    const elapsedHours = Math.max(0, (now.getTime() - new Date(lastObservation.observedAt).getTime()) / (1000 * 3600));
+    const predInput = {
+      Fill_Level_Percent: currentFill,
+      Previous_Day_Fill_Level_Percent: prevFill,
+      Days_Since_Last_Collection: daysSinceCollection,
+      Capacity_Litres: bin.capacityLiters,
+      Area_Type: bin.areaCategory,
+      Is_Weekend: now.getDay() === 0 || now.getDay() === 6,
+      Day_Of_Week: now.getDay(),
+      observationAgeHours,
+      lastObservedAt: lastObs ? lastObs.observedAt : bin.lastObservedAt,
+    };
 
-    // Linear rate prediction: min(100, lastObserved + rate * elapsedHours)
-    const predictedFill = Math.min(100.0, Math.max(0.0, lastObservation.fillPercentage + (effectiveHourlyRate * elapsedHours)));
+    const mlResult = predictor.predict(predInput);
 
-    // Confidence calculation: decays as observation becomes stale
-    let confidenceLevel = 'High';
-    let confidenceScore = 0.95;
-    if (elapsedHours > 72) {
-      confidenceLevel = 'Low';
-      confidenceScore = 0.35;
-    } else if (elapsedHours > 24) {
-      confidenceLevel = 'Medium';
-      confidenceScore = 0.65;
-    }
-
-    // Human-friendly observation display string
-    const ageRounded = Math.round(elapsedHours * 10) / 10;
-    let ageString = `${ageRounded} hours ago`;
-    if (ageRounded < 1.0) ageString = `${Math.round(ageRounded * 60)} minutes ago`;
-    else if (ageRounded >= 24) ageString = `${Math.round(ageRounded / 24)} days ago`;
-
-    const observationDisplay = `Last observed: ${lastObservation.fillPercentage}%, ${ageString}`;
-    const estimatedDisplay = `Estimated current fullness: ${Math.round(predictedFill)}%`;
+    let ageDisplay = `${Math.round(observationAgeHours)} hours ago`;
+    if (observationAgeHours < 1.0) ageDisplay = `${Math.round(observationAgeHours * 60)} minutes ago`;
+    else if (observationAgeHours >= 24) ageDisplay = `${Math.round(observationAgeHours / 24)} days ago`;
 
     return {
       binId: bin.id,
       binCode: bin.code,
       binName: bin.name,
-      wardName: bin.ward.name,
+      wardName: bin.ward?.name || 'Nashik',
       areaCategory: bin.areaCategory,
-      lastObservedFullness: lastObservation.fillPercentage,
-      lastObservationTimestamp: lastObservation.observedAt,
-      observationAgeHours: ageRounded,
-      observationDisplay,
-      estimatedCurrentFullness: Math.round(predictedFill * 10) / 10,
-      estimatedDisplay,
-      predictedFill24h: Math.min(100.0, Math.round((predictedFill + effectiveHourlyRate * 24) * 10) / 10),
-      confidenceLevel,
-      confidenceScore,
-      effectiveHourlyRate: Math.round(effectiveHourlyRate * 100) / 100,
-      eventMultiplierApplied: demandMultiplier,
-      activeEventName: eventNameApplied,
-      predictionMethod: 'Rate-Based Heuristic with Observation Decay & Event Multiplier',
-      explanation: `${estimatedDisplay} (${observationDisplay}, Confidence: ${confidenceLevel}${eventNameApplied ? `, adjusted for ${eventNameApplied}` : ''}). Estimate only; no physical sensors assumed.`,
+      capacityLiters: bin.capacityLiters,
+      lastObservedFullness: Math.round(currentFill * 10) / 10,
+      estimatedCurrentFullness: mlResult.predictedNextDayFill,
+      lastObservationTimestamp: lastObs ? lastObs.observedAt : bin.lastObservedAt,
+      observationAgeHours: Math.round(observationAgeHours * 10) / 10,
+      observationDisplay: `Last recorded observation: ${Math.round(currentFill)}%, ${ageDisplay}`,
+      predictedNextDayFill: mlResult.predictedNextDayFill,
+      predictedFillTomorrow: mlResult.predictedNextDayFill,
+      riskCategory: mlResult.overflowRisk ? 'HIGH' : 'NORMAL',
+      method: mlResult.modelVersion || 'Ridge Regression (Pure JS)',
+      overflowRisk: mlResult.overflowRisk,
+      overflowRiskLabel: mlResult.overflowRiskLabel,
+      predictionHorizon: mlResult.predictionHorizon,
+      generatedAt: mlResult.generatedAt,
+      modelVersion: mlResult.modelVersion,
+      confidenceLevel: mlResult.confidenceLevel,
+      confidenceScore: mlResult.confidenceScore,
+      dataProvenance: 'SYNTHETIC_SIMULATION',
+      label: mlResult.label,
+      disclaimer: `${mlResult.disclaimer} Trained on SYNTHETIC_SIMULATION timeseries records.`,
+      isRealMeasurement: false,
     };
   }
 
   /**
-   * Get fullness predictions across all registered bins
+   * Get predictions across all active bins
    */
   async getAllPredictions(wardId) {
     const where = { status: { in: ['active', 'full'] } };
@@ -135,8 +157,20 @@ export class PredictionService {
       select: { id: true },
     });
 
-    const predictions = await Promise.all(bins.map((b) => this.predictBinFullness(b.id)));
-    return predictions;
+    return await Promise.all(bins.map((b) => this.predictBinFullness(b.id)));
+  }
+
+  /**
+   * Retrain model on demand
+   */
+  async retrainModel() {
+    const result = await datasetService.trainAndPersistModel();
+    activePredictor = new BinPredictor(result.weights, {
+      version: result.model.version,
+      testMae: result.model.testMae,
+      testRmse: result.model.testRmse,
+    });
+    return result;
   }
 }
 

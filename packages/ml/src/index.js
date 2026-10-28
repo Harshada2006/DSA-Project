@@ -1,5 +1,10 @@
+export * from './features/featureExtractor.js';
+export * from './training/trainer.js';
+export * from './evaluation/evaluator.js';
+export * from './inference/predictor.js';
+
 export function calculateBaselineFill(lastObserved, hourlyRate, elapsedHours) {
-  return Math.min(100.0, Math.max(0.0, lastObserved + hourlyRate * elapsedHours));
+  return Math.min(100.0, Math.max(0.0, lastObserved + (hourlyRate || 0.75) * elapsedHours));
 }
 
 export function calculateConfidence(elapsedHours) {

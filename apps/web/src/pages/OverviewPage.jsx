@@ -8,15 +8,14 @@ import {
   ArrowRight,
   Plus,
   MapPin,
-  Cpu,
-  Layers,
   Sparkles,
   Users,
   ShieldCheck,
   TrendingUp,
   Truck,
   Building2,
-  Calendar,
+  AlertCircle,
+  Activity,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
@@ -25,7 +24,6 @@ import { StatCard } from '../components/common/StatCard.jsx';
 import { Card } from '../components/common/Card.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { Button } from '../components/common/Button.jsx';
-import { ProvenanceBadge } from '../components/common/ProvenanceBadge.jsx';
 
 export const OverviewPage = () => {
   const navigate = useNavigate();
@@ -63,7 +61,7 @@ export const OverviewPage = () => {
       <div className="flex flex-col items-center justify-center min-h-[450px] space-y-4">
         <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="text-base text-slate-700 font-semibold">Loading Nashik Municipal Waste Operations...</p>
-        <p className="text-xs text-slate-400">Connecting to C++ DSA Engine and SQLite Database</p>
+        <p className="text-xs text-slate-400">Connecting to Municipal Operations Database</p>
       </div>
     );
   }
@@ -89,15 +87,8 @@ export const OverviewPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Welcome Hero Banner with Photo */}
+      {/* Top Welcome Hero Banner */}
       <div className="relative rounded-3xl overflow-hidden shadow-lg border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white">
-        <div className="absolute right-0 top-0 bottom-0 w-full sm:w-1/2 opacity-25 sm:opacity-35 mix-blend-luminosity overflow-hidden pointer-events-none">
-          <img
-            src="/assets/command_center.jpg"
-            alt="Municipal Command Center"
-            className="w-full h-full object-cover"
-          />
-        </div>
         <div className="relative z-10 p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="max-w-xl space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
@@ -108,7 +99,7 @@ export const OverviewPage = () => {
               Welcome, {user?.name || 'Administrator'}
             </h1>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Monitoring 6 Municipal Wards (Panchavati, CIDCO, Nashik East, Nashik West, Satpur, Nashik Road) with C++17 algorithmic prioritization.
+              Monitoring 6 Municipal Wards (Panchavati, CIDCO, Nashik East, Nashik West, Satpur, Nashik Road) with automated collection prioritization.
             </p>
           </div>
 
@@ -117,9 +108,9 @@ export const OverviewPage = () => {
               variant="emerald"
               size="md"
               onClick={() => navigate('/organization/prioritized-tasks')}
-              icon={<Cpu className="w-4 h-4" />}
+              icon={<Activity className="w-4 h-4" />}
             >
-              Open C++ Priority Queue
+              Open Collection Priority
             </Button>
             <Button
               variant="outline"
@@ -135,7 +126,7 @@ export const OverviewPage = () => {
         </div>
       </div>
 
-      {/* KPI Stats Cards - Increased Font & Clean Visibility */}
+      {/* KPI Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Total Registered Bins"
@@ -145,9 +136,9 @@ export const OverviewPage = () => {
           icon={<Trash2 className="w-6 h-6 text-emerald-700" />}
         />
         <StatCard
-          title="Critical Overflow Risk"
+          title="High-Risk Bins"
           value={metrics.criticalUrgencyBins || 0}
-          subtitle="Score &ge; 80 in C++ Max-Heap"
+          subtitle="Priority Score >= 80"
           variant="rose"
           icon={<AlertTriangle className="w-6 h-6 text-rose-700" />}
         />
@@ -180,22 +171,22 @@ export const OverviewPage = () => {
             <span className="font-bold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors block">
               Manage Bins
             </span>
-            <span className="text-xs text-slate-500">View & record fill levels</span>
+            <span className="text-xs text-slate-500">View & monitor inventory</span>
           </div>
         </Link>
 
         <Link
-          to="/organization/route-optimization"
+          to="/organization/prioritized-tasks"
           className="group p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all flex items-center gap-4"
         >
-          <div className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
-            <Truck className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+            <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="font-bold text-sm text-slate-900 group-hover:text-sky-700 transition-colors block">
-              Route Planner
+            <span className="font-bold text-sm text-slate-900 group-hover:text-teal-700 transition-colors block">
+              Collection Priority
             </span>
-            <span className="text-xs text-slate-500">C++ Dijkstra & Greedy TSP</span>
+            <span className="text-xs text-slate-500">Urgency-ranked bins</span>
           </div>
         </Link>
 
@@ -225,25 +216,25 @@ export const OverviewPage = () => {
             <span className="font-bold text-sm text-slate-900 group-hover:text-purple-700 transition-colors block">
               E-Waste & Recyclers
             </span>
-            <span className="text-xs text-slate-500">MPCB certified handovers</span>
+            <span className="text-xs text-slate-500">Documented handovers</span>
           </div>
         </Link>
       </div>
 
       {/* Main Operational Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* C++ Heap Priority Breakdown */}
+        {/* Collection Priority Breakdown */}
         <Card className="p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-emerald-600" />
-                C++ Priority Queue Breakdown
+                <Activity className="w-5 h-5 text-emerald-600" />
+                Collection Priority Breakdown
               </h3>
-              <Badge variant="success">Max-Heap</Badge>
+              <Badge variant="success">Active Ranking</Badge>
             </div>
             <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-              Calculated dynamically via 4-factor formula (Overflow 40%, Delay 25%, Sensitive Location 20%, Missed 15%).
+              Calculated dynamically via 4 operational factors: fill level, pickup delay, sensitive area proximity, and missed collections.
             </p>
 
             <div className="space-y-3">
@@ -286,7 +277,7 @@ export const OverviewPage = () => {
               to="/organization/prioritized-tasks"
               className="text-sm font-bold text-emerald-700 hover:text-emerald-800 flex items-center justify-between group"
             >
-              <span>Inspect full C++ prioritization queue</span>
+              <span>Inspect full collection priority queue</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>

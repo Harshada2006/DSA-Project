@@ -54,4 +54,50 @@ router.post('/:id/missed', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN
   }
 });
 
+// Worker: Get vehicle capacity and load status
+router.get('/vehicle/status', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
+  try {
+    const status = await taskService.getVehicleStatus(req.user);
+    res.json({ success: true, data: status });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Worker: Confirm vehicle unloaded at municipal dumping facility
+router.post('/vehicle/unload', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
+  try {
+    const result = await taskService.recordTruckUnload(req.body.vehicleId, req.user, req);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Worker: Shortest-path route to municipal dumping facility (NWMPL Pathardi Shivar)
+router.get('/vehicle/route-to-dumping', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
+  try {
+    const route = await taskService.getRouteToDumpingFacility({
+      sourceNodeId: req.query.sourceNodeId,
+      avoidBlocked: req.query.avoidBlocked !== 'false',
+    });
+    res.json({ success: true, data: route });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Worker: Shortest-path route to assigned bin
+router.get('/bin/:binId/route', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
+  try {
+    const route = await taskService.getRouteToBin(req.params.binId, {
+      sourceNodeId: req.query.sourceNodeId,
+      avoidBlocked: req.query.avoidBlocked !== 'false',
+    });
+    res.json({ success: true, data: route });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

@@ -1,19 +1,51 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import { api } from '../api/client.js';
-import { Truck, KeyRound, Building2, UserCheck, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
+import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
+import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
+import {
+  Truck,
+  Lock,
+  Eye,
+  EyeOff,
+  UserCheck,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft,
+  KeyRound,
+  Mail,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
 
 export const WorkerAuthPage = () => {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'activate'
-  const [workerId, setWorkerId] = useState('WRK-NSK-101');
-  const [orgCode, setOrgCode] = useState('NMC-SWM');
-  const [password, setPassword] = useState('WorkerPassword123!');
-  
-  // Activation state
-  const [activationToken, setActivationToken] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const { t } = useLanguage();
+  // Modes: 'login' | 'activate' | 'forgot' | 'reset'
+  const [mode, setMode] = useState('login');
 
+  // Login inputs
+  const [identifier, setIdentifier] = useState(''); // Worker ID or email
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Activation inputs
+  const [actWorkerId, setActWorkerId] = useState('');
+  const [actToken, setActToken] = useState('');
+  const [actPassword, setActPassword] = useState('');
+  const [actConfirmPassword, setActConfirmPassword] = useState('');
+  const [showActPassword, setShowActPassword] = useState(false);
+
+  // Password reset inputs
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+
+  // Status feedback
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -21,48 +53,159 @@ export const WorkerAuthPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const clearMessages = () => {
     setError('');
+    setSuccessMsg('');
+  };
+
+  /* ============================================================
+   * MODULE 1: Worker Authentication & Direct 1-Click Sign In
+   * Authenticates field staff via Worker ID or registered municipal email
+   * ============================================================ */
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    clearMessages();
+
+    if (!identifier.trim() || !password) {
+      setError('Please provide your Worker ID or registered work email, and password.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await api.workerLogin(workerId, orgCode, password);
+      const res = await api.workerLogin(identifier.trim(), password);
       login(res.token, res.user);
       navigate('/worker/dashboard');
     } catch (err) {
-      setError(err.message || 'Worker login failed. Please verify credentials.');
+      setError(err.message || 'Worker login failed. Please verify your credentials or activate your account.');
     } finally {
       setLoading(false);
     }
   };
 
+  /* ============================================================
+   * MODULE 2: Worker Account Activation with Provisioning Token
+   * Activates pending worker profiles using tokens issued by administrators
+   * ============================================================ */
   const handleActivate = async (e) => {
-    e.preventDefault();
-    setError('');
+    if (e) e.preventDefault();
+    clearMessages();
+
+    if (!actWorkerId.trim() || !actToken.trim()) {
+      setError('Worker ID and invitation activation token are required.');
+      return;
+    }
+    if (actPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (actPassword !== actConfirmPassword) {
+      setError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await api.activateWorker(workerId, activationToken, newPassword);
+      const res = await api.activateWorker({
+        workerId: actWorkerId.trim(),
+        activationToken: actToken.trim(),
+        newPassword: actPassword,
+        confirmPassword: actConfirmPassword,
+      });
+
       setSuccessMsg(res.message || 'Worker account successfully activated! Please sign in.');
-      setActiveTab('login');
-      setPassword(newPassword);
+      setIdentifier(actWorkerId.trim());
+      setMode('login');
+      setActToken('');
+      setActPassword('');
+      setActConfirmPassword('');
     } catch (err) {
-      setError(err.message || 'Worker activation failed. Invalid token.');
+      setError(err.message || 'Worker activation failed. Token may be invalid, expired, or already used.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fillDemoWorker = () => {
-    setWorkerId('WRK-NSK-101');
-    setOrgCode('NMC-SWM');
-    setPassword('WorkerPassword123!');
+  // 3. Worker Forgot Password Request
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!resetEmail || !resetEmail.includes('@')) {
+      setError('Please provide your registered work email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.requestPasswordReset(resetEmail.trim());
+      setSuccessMsg(res.message || 'Password reset instructions have been generated.');
+      setMode('reset');
+    } catch (err) {
+      setError(err.message || 'Failed to request password reset.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Worker Confirm Reset
+  const handleResetConfirm = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!resetEmail || !resetCode) {
+      setError('Email and reset code are required.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.resetPassword({
+        email: resetEmail.trim(),
+        code: resetCode.trim(),
+        newPassword,
+        confirmPassword: confirmNewPassword,
+      });
+
+      setSuccessMsg(res.message || 'Password successfully updated! Please sign in with your new password.');
+      setIdentifier(resetEmail);
+      setMode('login');
+    } catch (err) {
+      setError(err.message || 'Password reset failed. Invalid or expired code.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden transition-colors">
       {/* Background glow effects */}
       <div className="absolute top-0 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -right-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Return home link and Controls */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors shadow-xs"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>{t('back_to_home', 'Back to EcoNexus Home')}</span>
+        </Link>
+      </div>
+
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
+        <LanguageSelector />
+        <ThemeToggle />
+      </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex justify-center mb-3">
@@ -72,28 +215,28 @@ export const WorkerAuthPage = () => {
             </div>
           </div>
         </div>
-        <h2 className="text-center text-2xl font-bold tracking-tight text-white">
-          Field Operations Portal
-        </h2>
-        <p className="mt-1 text-center text-xs text-slate-400">
-          Nashik Municipal Corporation • Collection Staff & Drivers
+        <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          {t('portal_worker_title', 'Field Worker Portal')}
+        </h1>
+        <p className="mt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+          {t('portal_worker_desc', 'View daily collection schedules, suggested optimized routes, scan bin assets, and report field issues.')}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/60 shadow-2xl rounded-2xl p-6 sm:p-8">
-          {/* Tabs */}
-          <div className="flex rounded-xl bg-slate-900/70 p-1 mb-6 border border-slate-700/50">
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl p-6 sm:p-8 transition-colors">
+          {/* Top navigation tabs between Sign In and Activate Account */}
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 mb-6 border border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={() => {
-                setActiveTab('login');
-                setError('');
+                clearMessages();
+                setMode('login');
               }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === 'login'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : 'text-slate-400 hover:text-white'
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                mode === 'login'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Worker Sign In
@@ -101,163 +244,93 @@ export const WorkerAuthPage = () => {
             <button
               type="button"
               onClick={() => {
-                setActiveTab('activate');
-                setError('');
+                clearMessages();
+                setMode('activate');
               }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                activeTab === 'activate'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : 'text-slate-400 hover:text-white'
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                mode === 'activate'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Activate Account
             </button>
           </div>
 
+          {/* Feedback messages */}
           {error && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300">
-              {error}
+            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-600 dark:text-rose-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>{successMsg}</span>
             </div>
           )}
 
-          {activeTab === 'login' ? (
+          {/* 1. WORKER SIGN IN */}
+          {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
+
+
               <div>
-                <label className="block text-xs font-medium text-slate-300">Worker ID</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserCheck className="h-4 w-4 text-slate-500" />
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Worker ID or Work Email
+                </label>
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <UserCheck className="h-4 w-4" />
                   </div>
                   <input
                     type="text"
                     required
-                    value={workerId}
-                    onChange={(e) => setWorkerId(e.target.value)}
-                    placeholder="WRK-NSK-101"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="e.g. WRK-NSK-101 or 101 or worker1"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300">Organization Code</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Building2 className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={orgCode}
-                    onChange={(e) => setOrgCode(e.target.value)}
-                    placeholder="NMC-SWM"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMessages();
+                      setResetEmail(identifier.includes('@') ? identifier : '');
+                      setMode('forgot');
+                    }}
+                    className="text-xs text-amber-600 dark:text-amber-400 hover:underline font-medium cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Password</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-slate-500" />
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="h-4 w-4" />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="Enter worker password"
+                    className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
-                </div>
-              </div>
-
-              {/* Demo Helper Button */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
-                <div className="text-[11px] text-amber-300">
-                  <span className="font-semibold flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Pre-Seeded Worker:
-                  </span>
-                  <span className="font-mono text-xs text-amber-200">WRK-NSK-101</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={fillDemoWorker}
-                  className="text-[11px] bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 px-2 py-1 rounded-md font-medium transition-colors"
-                >
-                  Quick Fill
-                </button>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                  {loading ? 'Authenticating...' : 'Sign In as Worker'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleActivate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Worker ID</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserCheck className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={workerId}
-                    onChange={(e) => setWorkerId(e.target.value)}
-                    placeholder="WRK-NSK-101"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Activation Token</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={activationToken}
-                    onChange={(e) => setActivationToken(e.target.value)}
-                    placeholder="Enter token issued by Admin"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Set New Password</label>
-                <div className="mt-1 relative rounded-xl shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-slate-500" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -265,36 +338,304 @@ export const WorkerAuthPage = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
                 >
-                  {loading ? 'Activating...' : 'Activate & Set Password'}
+                  {loading ? 'Authenticating...' : 'Sign In as Field Worker'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  New worker with an invitation?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMessages();
+                      setMode('activate');
+                    }}
+                    className="font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Activate Account
+                  </button>
+                </p>
               </div>
             </form>
           )}
 
-          <div className="mt-6 pt-6 border-t border-slate-700/60">
-            <div className="text-center text-xs text-slate-400 space-y-2">
-              <p>
-                Are you a Citizen reporting waste?{' '}
-                <Link to="/citizen/login" className="text-emerald-400 hover:text-emerald-300 font-semibold underline">
-                  Citizen Portal
-                </Link>
-              </p>
-              <p>
-                Municipal Organization Officer?{' '}
-                <Link to="/organization/login" className="text-teal-400 hover:text-teal-300 font-semibold underline">
-                  Admin Sign In
-                </Link>
-              </p>
-              <p className="pt-2">
-                <Link to="/" className="text-slate-500 hover:text-slate-300">
-                  ← Back to Home
-                </Link>
-              </p>
+          {/* 2. WORKER ACCOUNT ACTIVATION */}
+          {mode === 'activate' && (
+            <div>
+              <div className="mb-4 text-left">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-500" />
+                  Activate Invited Worker Account
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Workers are provisioned by your municipal supervisor. Activate with your invitation token.
+                </p>
+
+
+              </div>
+
+              <form onSubmit={handleActivate} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Worker ID or Registered Work Email</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <UserCheck className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={actWorkerId}
+                      onChange={(e) => setActWorkerId(e.target.value)}
+                      placeholder="e.g. WRK-NSK-103 or worker.pending@econexus.gov.in"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Activation Token (Issued by Administrator)
+                  </label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={actToken}
+                      onChange={(e) => setActToken(e.target.value.trim())}
+                      placeholder="e.g. ACT-NSK-2026"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Create New Password (min 8 chars)</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showActPassword ? 'text' : 'password'}
+                      required
+                      value={actPassword}
+                      onChange={(e) => setActPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      className="block w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowActPassword(!showActPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showActPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Confirm Password</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showActPassword ? 'text' : 'password'}
+                      required
+                      value={actConfirmPassword}
+                      onChange={(e) => setActConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Activating...' : 'Activate & Save Password'}
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Already activated? Return to Sign In
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ============================================================
+           * MODULE 3: Worker Password Recovery & Reset
+           * Handles municipal worker password resets via verified email code
+           * ============================================================ */}
+          {mode === 'forgot' && (
+            <div>
+              <div className="mb-4 text-left">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Reset Worker Password</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Enter your registered work email to receive a password reset token.
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotRequest} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Registered Work Email</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="worker@econexus.gov.in"
+                      className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Sending Code...' : 'Send Reset Code'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Return to Worker Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. WORKER RESET CONFIRM */}
+          {mode === 'reset' && (
+            <div>
+              <div className="mb-4 text-left">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Enter New Worker Password</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Enter the reset code sent to <strong className="text-slate-900 dark:text-white font-mono">{resetEmail}</strong> and your new password.
+                </p>
+              </div>
+
+              <form onSubmit={handleResetConfirm} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Reset Code</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value.trim())}
+                      placeholder="6-digit reset code"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">New Password (min 8 chars)</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="block w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Confirm New Password</label>
+                  <div className="mt-1 relative rounded-xl shadow-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      required
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {loading ? 'Updating Password...' : 'Save New Password'}
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancel and Return to Sign In
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

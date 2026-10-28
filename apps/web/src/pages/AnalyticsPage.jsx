@@ -25,6 +25,7 @@ import {
   Layers,
   MapPin,
   FileSpreadsheet,
+  Building2,
 } from 'lucide-react';
 
 export const AnalyticsPage = () => {
@@ -67,7 +68,7 @@ export const AnalyticsPage = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Audited solid waste metrics, collection efficiency, and algorithm benchmark metrics
+            Audited solid waste metrics, collection efficiency, and municipal operational metrics
           </p>
         </div>
 
@@ -115,7 +116,7 @@ export const AnalyticsPage = () => {
           title="Verified Facilities"
           value={metrics.verifiedFacilitiesCount || 0}
           subtitle="Weighbridges & Recyclers"
-          icon={<Cpu className="w-5 h-5 text-purple-600" />}
+          icon={<Building2 className="w-5 h-5 text-purple-600" />}
         />
       </div>
 
