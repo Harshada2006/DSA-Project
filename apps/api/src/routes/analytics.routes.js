@@ -5,10 +5,20 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = Router();
 
 // Admin Dashboard Summary Metrics
-router.get('/dashboard', authenticate, authorize('ORGANIZATION_ADMIN'), async (_req, res) => {
+router.get('/dashboard', authenticate, authorize('ORGANIZATION_ADMIN'), async (req, res) => {
   try {
-    const summary = await analyticsService.getDashboardSummary();
+    const summary = await analyticsService.getDashboardSummary(req.query);
     res.json({ success: true, data: summary });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Area-Wise Historical Analytics (Ward / Bin / City-wide with date range)
+router.get('/area-history', authenticate, authorize('ORGANIZATION_ADMIN', 'CITIZEN', 'WORKER'), async (req, res) => {
+  try {
+    const history = await analyticsService.getAreaWiseHistory(req.query);
+    res.json({ success: true, data: history });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

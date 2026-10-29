@@ -202,6 +202,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  assignTask: (id, data) =>
+    fetchJson(`/tasks/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
   startTask: (id) =>
     fetchJson(`/tasks/${id}/start`, {
       method: 'POST',
@@ -365,7 +371,21 @@ export const api = {
   getBinPrediction: (binId) => fetchJson(`/predictions/${binId}`),
 
   // Analytics & Admin
-  getDashboardSummary: () => fetchJson('/analytics/dashboard'),
+  getDashboardSummary: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.wardId) q.set('wardId', params.wardId);
+    return fetchJson(`/analytics/dashboard?${q.toString()}`);
+  },
+
+  getAreaWiseHistory: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.wardId) q.set('wardId', params.wardId);
+    if (params.binId) q.set('binId', params.binId);
+    if (params.startDate) q.set('startDate', params.startDate);
+    if (params.endDate) q.set('endDate', params.endDate);
+    if (params.limitDays) q.set('limitDays', params.limitDays);
+    return fetchJson(`/analytics/area-history?${q.toString()}`);
+  },
 
   getExportUrl: (type) => `${BASE_URL}/analytics/export?type=${type}`,
 

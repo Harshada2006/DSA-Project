@@ -15,6 +15,45 @@ function findNearestRoadNode(nodes, lat, lng) {
   return closest || nodes[0];
 }
 
+export function getHaversineDistanceMeters(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+  const R = 6371e3; // metres
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+export async function resolveWorkerUser(workerIdentifier) {
+  if (!workerIdentifier) return null;
+  let user = await prisma.user.findFirst({
+    where: { id: workerIdentifier, role: 'WORKER' },
+  });
+  if (!user) {
+    const profile = await prisma.workerProfile.findFirst({
+      where: {
+        OR: [
+          { id: workerIdentifier },
+          { workerId: workerIdentifier },
+          { userId: workerIdentifier },
+        ],
+      },
+      include: { user: true },
+    });
+    if (profile && profile.user) {
+      user = profile.user;
+    }
+  }
+  return user;
+}
+
 export class TaskService {
   /**
    * Get tasks with role-aware scoping
@@ -61,19 +100,46 @@ export class TaskService {
     const bin = await prisma.bin.findUnique({ where: { id: binId } });
     if (!bin) throw new Error('Target bin not found.');
 
+    let resolvedWorkerUserId = null;
+    if (assignedWorkerId) {
+      const workerUser = await resolveWorkerUser(assignedWorkerId);
+      if (workerUser) {
+        resolvedWorkerUserId = workerUser.id;
+      }
+    }
+
+    // Check if an active/pending task already exists for this bin to avoid duplicate dispatching
+    const existingActiveTask = await prisma.collectionTask.findFirst({
+      where: {
+        binId,
+        status: { in: ['pending', 'assigned', 'started'] },
+      },
+      include: {
+        bin: { include: { ward: true } },
+        assignedWorker: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (existingActiveTask) {
+      if (resolvedWorkerUserId && existingActiveTask.assignedWorkerId !== resolvedWorkerUserId) {
+        return await this.assignTask(existingActiveTask.id, { assignedWorkerId: resolvedWorkerUserId }, adminUser, req);
+      }
+      return existingActiveTask;
+    }
+
     const task = await prisma.collectionTask.create({
       data: {
         binId,
-        assignedWorkerId: assignedWorkerId || null,
+        assignedWorkerId: resolvedWorkerUserId || null,
         taskPriority: taskPriority || bin.urgency || 'normal',
         priorityScore: priorityScore || bin.priorityScore || 0.0,
-        status: assignedWorkerId ? 'assigned' : 'pending',
+        status: resolvedWorkerUserId ? 'assigned' : 'pending',
         notes: notes || null,
         scheduledDate: new Date(),
       },
       include: {
         bin: { include: { ward: true } },
-        assignedWorker: { select: { id: true, name: true } },
+        assignedWorker: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -82,11 +148,65 @@ export class TaskService {
       action: 'COLLECTION_TASK_CREATED',
       resource: 'CollectionTask',
       resourceId: task.id,
-      details: { binId, assignedWorkerId },
+      details: { binId, assignedWorkerId: resolvedWorkerUserId },
       req,
     });
 
     return task;
+  }
+
+  /**
+   * Assign or reassign a collection task to a worker (Admin only)
+   */
+  async assignTask(taskId, assignData, adminUser, req) {
+    const task = await prisma.collectionTask.findUnique({
+      where: { id: taskId },
+      include: { bin: true },
+    });
+    if (!task) throw new Error('Task not found.');
+
+    if (task.status === 'collected') {
+      throw new Error('Completed task cannot be reassigned.');
+    }
+
+    const workerIdentifier = assignData.assignedWorkerId || assignData.workerId;
+    if (!workerIdentifier) {
+      throw new Error('Worker ID is required for task assignment.');
+    }
+
+    const workerUser = await resolveWorkerUser(workerIdentifier);
+    if (!workerUser) {
+      throw new Error('Assigned worker not found or is not an active worker.');
+    }
+
+    const updatedTask = await prisma.collectionTask.update({
+      where: { id: taskId },
+      data: {
+        assignedWorkerId: workerUser.id,
+        status: task.status === 'started' ? 'started' : 'assigned',
+        ...(assignData.taskPriority ? { taskPriority: assignData.taskPriority } : {}),
+        ...(assignData.notes ? { notes: assignData.notes } : {}),
+      },
+      include: {
+        bin: { include: { ward: true } },
+        assignedWorker: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    await logAuditEvent({
+      userId: adminUser.id,
+      action: 'COLLECTION_TASK_ASSIGNED',
+      resource: 'CollectionTask',
+      resourceId: taskId,
+      details: {
+        assignedWorkerId: workerUser.id,
+        workerName: workerUser.name,
+        binCode: task.bin?.code,
+      },
+      req,
+    });
+
+    return updatedTask;
   }
 
   /**
@@ -140,14 +260,24 @@ export class TaskService {
       latitude = null,
       gpsLng = null,
       longitude = null,
+      accuracyMeters = null,
     } = collectionData;
 
     const now = new Date();
     const fillBefore = task.bin.currentFillPercentage;
     const fillAfter = Math.max(0.0, Math.min(100.0, parseFloat(observedFillAfter)));
     const actualWeight = parseFloat(collectedWeightKg ?? weightKg) || Math.round(((fillBefore - fillAfter) / 100.0) * (task.bin.capacityLiters * 0.35)) || 50;
-    const finalGpsLat = (gpsLat ?? latitude) ? parseFloat(gpsLat ?? latitude) : null;
-    const finalGpsLng = (gpsLng ?? longitude) ? parseFloat(gpsLng ?? longitude) : null;
+    const finalGpsLat = (gpsLat ?? latitude) != null ? parseFloat(gpsLat ?? latitude) : null;
+    const finalGpsLng = (gpsLng ?? longitude) != null ? parseFloat(gpsLng ?? longitude) : null;
+    const parsedAccuracy = accuracyMeters != null ? parseFloat(accuracyMeters) : null;
+
+    let distanceToBinMeters = null;
+    let gpsVerified = false;
+    if (finalGpsLat != null && finalGpsLng != null && task.bin.latitude != null && task.bin.longitude != null) {
+      distanceToBinMeters = Math.round(getHaversineDistanceMeters(finalGpsLat, finalGpsLng, task.bin.latitude, task.bin.longitude));
+      // Standard tolerance: within 500 meters of registered municipal receptacle
+      gpsVerified = distanceToBinMeters <= 500;
+    }
 
     const [updatedTask] = await prisma.$transaction([
       prisma.collectionTask.update({
@@ -220,11 +350,24 @@ export class TaskService {
       action: 'COLLECTION_RECORDED',
       resource: 'CollectionTask',
       resourceId: taskId,
-      details: { binId: task.binId, collectedWeightKg: actualWeight },
+      details: {
+        binId: task.binId,
+        collectedWeightKg: actualWeight,
+        workerGpsLat: finalGpsLat,
+        workerGpsLng: finalGpsLng,
+        accuracyMeters: parsedAccuracy,
+        distanceToBinMeters,
+        gpsVerified,
+      },
       req,
     });
 
-    return updatedTask;
+    return {
+      ...updatedTask,
+      distanceToBinMeters,
+      gpsVerified,
+      accuracyMeters: parsedAccuracy,
+    };
   }
 
   /**

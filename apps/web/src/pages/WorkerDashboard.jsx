@@ -73,6 +73,14 @@ export const WorkerDashboard = () => {
     gpsConsent: true,
   });
   const [collectionSubmitting, setCollectionSubmitting] = useState(false);
+  const [gpsTelemetry, setGpsTelemetry] = useState({
+    state: 'idle', // 'idle' | 'locating' | 'acquired' | 'failed'
+    lat: null,
+    lng: null,
+    accuracy: null,
+    distanceMeters: null,
+    message: '',
+  });
 
   // Suggested Route (DSA Shortest Path) State
   const [sourceId, setSourceId] = useState('N-CBS');
@@ -185,8 +193,71 @@ export const WorkerDashboard = () => {
   }, [tasks]);
 
   /* ========================================================================== */
-  /* MODULE 1: Record Collection Handler                                        */
+  /* MODULE 1: Record Collection Handler & Device GPS Verification              */
   /* ========================================================================== */
+  const acquireDevicePosition = () => {
+    return new Promise((resolve, reject) => {
+      if (typeof window === 'undefined' || !navigator.geolocation) {
+        reject(new Error('Device does not support HTML5 Geolocation API.'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(pos),
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+      );
+    });
+  };
+
+  const handleAcquireGps = async () => {
+    setGpsTelemetry((prev) => ({
+      ...prev,
+      state: 'locating',
+      message: 'Contacting device GPS receiver...',
+    }));
+
+    try {
+      const pos = await acquireDevicePosition();
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const accuracy = Math.round(pos.coords.accuracy);
+
+      let distanceMeters = null;
+      if (selectedTask?.bin?.latitude && selectedTask?.bin?.longitude) {
+        const R = 6371e3;
+        const phi1 = (lat * Math.PI) / 180;
+        const phi2 = (selectedTask.bin.latitude * Math.PI) / 180;
+        const deltaPhi = ((selectedTask.bin.latitude - lat) * Math.PI) / 180;
+        const deltaLambda = ((selectedTask.bin.longitude - lng) * Math.PI) / 180;
+        const a =
+          Math.sin(deltaPhi / 2) ** 2 +
+          Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
+        distanceMeters = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+      }
+
+      setGpsTelemetry({
+        state: 'acquired',
+        lat,
+        lng,
+        accuracy,
+        distanceMeters,
+        message:
+          distanceMeters !== null
+            ? `Verified GPS fix: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E (±${accuracy}m accuracy, ${distanceMeters}m from target)`
+            : `Verified GPS fix: ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E (±${accuracy}m accuracy)`,
+      });
+    } catch (err) {
+      setGpsTelemetry({
+        state: 'failed',
+        lat: null,
+        lng: null,
+        accuracy: null,
+        distanceMeters: null,
+        message: `GPS telemetry unavailable (${err.message}). Safe audit fallback enabled.`,
+      });
+    }
+  };
+
   const handleRecordCollection = async (e) => {
     e.preventDefault();
 
@@ -213,12 +284,28 @@ export const WorkerDashboard = () => {
 
     setCollectionSubmitting(true);
     try {
+      let finalLat = gpsTelemetry.lat;
+      let finalLng = gpsTelemetry.lng;
+      let accuracyMeters = gpsTelemetry.accuracy;
+
+      if (!finalLat && collectionForm.gpsConsent && navigator.geolocation) {
+        try {
+          const pos = await acquireDevicePosition();
+          finalLat = pos.coords.latitude;
+          finalLng = pos.coords.longitude;
+          accuracyMeters = Math.round(pos.coords.accuracy);
+        } catch (_geoErr) {
+          // Do NOT fabricate coordinates - send undefined so backend records without spoofing
+        }
+      }
+
       const updatedTask = await api.recordCollection(selectedTask.id, {
         weightKg: weight,
         wasteType: collectionForm.wasteType,
         notes: collectionForm.notes || undefined,
-        latitude: selectedTask.bin?.latitude || 19.9975,
-        longitude: selectedTask.bin?.longitude || 73.7898,
+        gpsLat: finalLat || undefined,
+        gpsLng: finalLng || undefined,
+        accuracyMeters: accuracyMeters || undefined,
         gpsConsent: true,
         observedFillAfter: 0.0,
       });
@@ -262,9 +349,15 @@ export const WorkerDashboard = () => {
           : prev
       );
 
+      const gpsNote = updatedTask?.gpsVerified
+        ? ` (GPS verified within ${updatedTask.distanceToBinMeters}m of receptacle)`
+        : updatedTask?.distanceToBinMeters !== null && updatedTask?.distanceToBinMeters !== undefined
+        ? ` (GPS recorded: ${updatedTask.distanceToBinMeters}m from receptacle)`
+        : '';
+
       setNotice({
         type: 'success',
-        text: `✓ Collection successfully recorded for ${selectedTask.bin?.code || 'Bin'} (${selectedTask.bin?.name || 'Receptacle'})! Status updated to Collected.`,
+        text: `✓ Collection successfully recorded for ${selectedTask.bin?.code || 'Bin'} (${selectedTask.bin?.name || 'Receptacle'})! Status updated to Collected${gpsNote}.`,
       });
 
       // Reset form
@@ -1275,20 +1368,55 @@ export const WorkerDashboard = () => {
                     />
                   </div>
 
-                  {/* GPS Verification Consent */}
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      id="gpsConsent"
-                      required
-                      checked={collectionForm.gpsConsent}
-                      onChange={(e) => setCollectionForm({ ...collectionForm, gpsConsent: e.target.checked })}
-                      className="mt-1 rounded accent-amber-500 h-4 w-4 cursor-pointer"
-                    />
-                    <label htmlFor="gpsConsent" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                      <strong className="text-slate-900 dark:text-white block">GPS Verification Consent *</strong>
-                      I confirm physical presence at this collection point in Nashik and authorize recording verified location telemetry with this municipal audit record.
-                    </label>
+                  {/* GPS Verification Consent & Device Telemetry */}
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="gpsConsent"
+                        required
+                        checked={collectionForm.gpsConsent}
+                        onChange={(e) => setCollectionForm({ ...collectionForm, gpsConsent: e.target.checked })}
+                        className="mt-1 rounded accent-amber-500 h-4 w-4 cursor-pointer"
+                      />
+                      <label htmlFor="gpsConsent" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <strong className="text-slate-900 dark:text-white block">GPS Verification Consent *</strong>
+                        I confirm physical presence at this collection point in Nashik and authorize recording verified location telemetry with this municipal audit record.
+                      </label>
+                    </div>
+
+                    {/* Live GPS Telemetry Status */}
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                        {gpsTelemetry.state === 'acquired' ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                            {gpsTelemetry.message}
+                          </span>
+                        ) : gpsTelemetry.state === 'failed' ? (
+                          <span className="text-amber-700 dark:text-amber-400">
+                            {gpsTelemetry.message}
+                          </span>
+                        ) : gpsTelemetry.state === 'locating' ? (
+                          <span className="text-slate-500 animate-pulse">
+                            {gpsTelemetry.message}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">
+                            Device GPS ready to capture upon submission.
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAcquireGps}
+                        disabled={gpsTelemetry.state === 'locating'}
+                        className="px-3 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        {gpsTelemetry.state === 'locating' ? 'Locating...' : 'Acquire GPS Fix'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Submit Action Button */}
@@ -1929,11 +2057,13 @@ export const WorkerDashboard = () => {
                         onChange={(e) => setHandoverForm({ ...handoverForm, facilityId: e.target.value })}
                         className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       >
-                        {facilities.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name} ({f.verificationStatus ? f.verificationStatus.toUpperCase() : 'VERIFIED'} • {f.area || 'Nashik'})
-                          </option>
-                        ))}
+                        {facilities
+                          .filter((f) => f.facilityType !== 'scrap_dealer' && f.facilityType !== 'general_waste_facility')
+                          .map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name} ({f.verificationStatus ? f.verificationStatus.toUpperCase() : 'VERIFIED'} • {f.facilityType?.replace(/_/g, ' ')})
+                            </option>
+                          ))}
                       </select>
                     </div>
 

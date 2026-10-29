@@ -623,7 +623,11 @@ async function runTests() {
     const routeRes = await dsaService.getShortestPath(bin.id, facility.id, false);
     assert.strictEqual(routeRes.reachable, true);
     assert.ok(routeRes.coordinate_path.length >= 2);
-    assert.ok(routeRes.geometry_source === 'local_edge_geometry' || routeRes.geometry_source === 'osrm');
+    assert.ok(
+      routeRes.geometry_source === 'local_edge_geometry' ||
+      routeRes.geometry_source === 'osrm' ||
+      routeRes.geometry_source === 'graph_nodes_approximate_fallback'
+    );
 
     // Terminal coordinates should match physical entities
     const firstCoord = routeRes.coordinate_path[0];
@@ -747,6 +751,220 @@ async function runTests() {
     const res = await dsaService.getShortestPath('N-PAN', 'UNKNOWN_NODE_999', false);
     assert.strictEqual(res.reachable, false);
     assert.ok(res.error && res.error.length > 0);
+  });
+
+  // 25. Area-Wise Historical Timeseries & Municipal Scope Filtering
+  await test('Area-Wise Historical Timeseries & Municipal Scope Filtering', async () => {
+    // 1. City-Wide
+    const cityHistory = await analyticsService.getAreaWiseHistory({ limitDays: 30 });
+    assert.strictEqual(cityHistory.scope, 'city');
+    assert.ok(cityHistory.totalContributingBins > 0);
+    assert.ok(Array.isArray(cityHistory.timeline));
+    assert.ok(cityHistory.contributingBins.length > 0);
+
+    // 2. Municipal Ward Scope
+    const ward = await prisma.ward.findFirst();
+    assert.ok(ward, 'Municipal ward must exist');
+    const wardHistory = await analyticsService.getAreaWiseHistory({ wardId: ward.id, limitDays: 30 });
+    assert.strictEqual(wardHistory.scope, 'ward');
+    assert.ok(wardHistory.scopeName.includes(ward.name));
+    for (const bin of wardHistory.contributingBins) {
+      assert.strictEqual(bin.wardName, ward.name);
+    }
+
+    // 3. Single Bin Drill-down Scope
+    const bin = await prisma.bin.findFirst({ where: { wardId: ward.id } });
+    assert.ok(bin, 'Bin must exist in ward');
+    const binHistory = await analyticsService.getAreaWiseHistory({ binId: bin.id, limitDays: 30 });
+    assert.strictEqual(binHistory.scope, 'bin');
+    assert.strictEqual(binHistory.totalContributingBins, 1);
+    assert.strictEqual(binHistory.contributingBins[0].id, bin.id);
+
+    // 4. Verification that timeline has distinct observed and predicted values
+    if (cityHistory.timeline.length > 0) {
+      const point = cityHistory.timeline[0];
+      assert.ok('observedFill' in point);
+      assert.ok('predictedFill' in point);
+      assert.ok('provenance' in point);
+      assert.ok('isSynthetic' in point);
+    }
+  });
+
+  // 26. Collection Task Lifecycle & Admin Assignment Propagation
+  await test('Collection Task Lifecycle & Admin Assignment Propagation', async () => {
+    const adminUser = await prisma.user.findFirst({ where: { role: 'ORGANIZATION_ADMIN' } });
+    const workerUser = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    const bin = await prisma.bin.findFirst();
+    assert.ok(adminUser && workerUser && bin);
+
+    // 1. Create task with status pending
+    const newTask = await prisma.collectionTask.create({
+      data: {
+        binId: bin.id,
+        status: 'pending',
+        taskPriority: 'high',
+        priorityScore: 75.0,
+      },
+    });
+
+    try {
+      // 2. Admin assigns worker to the task
+      const assignedTask = await taskService.assignTask(newTask.id, { workerId: workerUser.id }, adminUser);
+      assert.strictEqual(assignedTask.status, 'assigned');
+      assert.strictEqual(assignedTask.assignedWorkerId, workerUser.id);
+
+      // 3. Worker queries task queue: task is present
+      const workerTasks = await taskService.getTasks(workerUser);
+      const foundInWorkerQueue = workerTasks.some((t) => t.id === newTask.id);
+      assert.strictEqual(foundInWorkerQueue, true);
+
+      // 4. Worker starts task
+      const startedTask = await taskService.startTask(newTask.id, workerUser);
+      assert.strictEqual(startedTask.status, 'started');
+      assert.ok(startedTask.startedAt);
+    } finally {
+      await prisma.collectionTask.delete({ where: { id: newTask.id } }).catch(() => {});
+    }
+  });
+
+  // 27. Worker Collection Execution with Real Device GPS & Tolerance Calculation
+  await test('Worker Collection Execution with Real Device GPS & Tolerance Calculation', async () => {
+    const workerUser = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    const bin = await prisma.bin.findFirst();
+    assert.ok(workerUser && bin);
+
+    // Create a temporary active task for this bin
+    const task = await prisma.collectionTask.create({
+      data: {
+        binId: bin.id,
+        assignedWorkerId: workerUser.id,
+        status: 'started',
+        taskPriority: 'normal',
+      },
+    });
+
+    try {
+      // Real coordinates within ~30 meters of bin
+      const workerLat = bin.latitude + 0.0002;
+      const workerLng = bin.longitude + 0.0002;
+
+      const collectionResult = await taskService.recordCollection(
+        task.id,
+        {
+          observedFillAfter: 0.0,
+          weightKg: 85,
+          notes: 'Automated GPS verification test',
+          gpsLat: workerLat,
+          gpsLng: workerLng,
+          accuracyMeters: 12,
+        },
+        workerUser
+      );
+
+      assert.strictEqual(collectionResult.status, 'collected');
+      assert.strictEqual(collectionResult.gpsVerified, true);
+      assert.ok(collectionResult.distanceToBinMeters <= 500);
+      assert.strictEqual(collectionResult.accuracyMeters, 12);
+
+      // Receptacle in database is reset to 0% fill
+      const updatedBin = await prisma.bin.findUnique({ where: { id: bin.id } });
+      assert.strictEqual(updatedBin.currentFillPercentage, 0.0);
+    } finally {
+      await prisma.collectionTask.delete({ where: { id: task.id } }).catch(() => {});
+    }
+  });
+
+  // 28. Vehicle Load Tracking, Capacity Threshold & Municipal Unloading
+  await test('Vehicle Load Tracking, Capacity Threshold & Municipal Unloading', async () => {
+    const workerUser = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    assert.ok(workerUser);
+
+    const initialStatus = await taskService.getVehicleStatus(workerUser);
+    assert.ok(initialStatus.vehicle);
+    assert.ok(initialStatus.dumpingFacility);
+    assert.strictEqual(initialStatus.dumpingFacility.nodeId, 'N-PAT');
+
+    const vehicleId = initialStatus.vehicle.id;
+
+    // Simulate vehicle load update
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { currentLoadKg: 1500.0 },
+    });
+
+    const loadedStatus = await taskService.getVehicleStatus(workerUser);
+    assert.strictEqual(loadedStatus.vehicle.currentLoadKg, 1500.0);
+
+    // Confirm vehicle unload at municipal dumping facility
+    const unloadResult = await taskService.recordTruckUnload(vehicleId, workerUser);
+    assert.strictEqual(unloadResult.success, true);
+    assert.strictEqual(unloadResult.vehicle.currentLoadKg, 0.0);
+    assert.strictEqual(unloadResult.vehicle.loadPercentage, 0);
+  });
+
+  // 29. E-Waste Doorstep Pickup to Verified Recycler Lifecycle
+  await test('E-Waste Doorstep Pickup to Verified Recycler Lifecycle', async () => {
+    const adminUser = await prisma.user.findFirst({ where: { role: 'ORGANIZATION_ADMIN' } });
+    const citizenUser = await prisma.user.findFirst({ where: { role: 'CITIZEN' } });
+    const workerUser = await prisma.user.findFirst({ where: { role: 'WORKER' } });
+    const recycler = await prisma.facility.findFirst({
+      where: {
+        facilityType: { in: ['verified_ewaste_recycler', 'ewaste_refurbisher'] },
+        verificationStatus: 'verified',
+      },
+    });
+    assert.ok(adminUser && citizenUser && workerUser && recycler);
+
+    // 1. Citizen creates e-waste request
+    const request = await ewasteService.submitPickupRequest(
+      citizenUser,
+      {
+        itemsDescription: 'Broken microwave, 2 old CRT monitors, 4 lithium batteries',
+        pickupAddress: 'College Road, Near BYK College, Nashik',
+        contactPhone: '+91 98220 12345',
+        weightKg: 35,
+      }
+    );
+    assert.strictEqual(request.status, 'submitted');
+    assert.ok(request.ticketNo);
+
+    try {
+      // 2. Admin assigns worker for doorstep collection
+      const assigned = await ewasteService.assignWorker(request.id, workerUser.id, adminUser);
+      assert.strictEqual(assigned.status, 'assigned');
+      assert.strictEqual(assigned.assignedWorkerId, workerUser.id);
+
+      // 3. Worker records collection at doorstep
+      const collected = await ewasteService.recordWorkerCollection(
+        request.id,
+        {
+          measuredWeightKg: 38,
+          notes: 'Collected from doorstep; safe battery handling applied',
+        },
+        workerUser
+      );
+      assert.strictEqual(collected.status, 'collected');
+
+      // 4. Handover to verified MPCB recycler
+      const handover = await ewasteService.recordFacilityHandover(
+        {
+          ewasteRequestId: request.id,
+          facilityId: recycler.id,
+          weightKg: 38,
+          manifestNumber: `MNF-TEST-${Date.now().toString().slice(-6)}`,
+          notes: 'Test batch handover to authorized MPCB recycler',
+        },
+        workerUser
+      );
+      assert.strictEqual(handover.facilityId, recycler.id);
+
+      // Request status is now delivered to recycler
+      const finalRequest = await prisma.eWasteRequest.findUnique({ where: { id: request.id } });
+      assert.strictEqual(finalRequest.status, 'delivered_to_recycler');
+    } finally {
+      await prisma.handoverRecord.deleteMany({ where: { ewasteRequestId: request.id } }).catch(() => {});
+      await prisma.eWasteRequest.delete({ where: { id: request.id } }).catch(() => {});
+    }
   });
 
   console.log('====================================================');

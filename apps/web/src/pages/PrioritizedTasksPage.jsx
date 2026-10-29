@@ -3,6 +3,7 @@ import { api } from '../api/client.js';
 import { Card } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
+import { Modal } from '../components/common/Modal.jsx';
 import { SearchInput } from '../components/common/SearchInput.jsx';
 import {
   ListOrdered,
@@ -14,6 +15,7 @@ import {
   MapPin,
   Send,
   Activity,
+  UserCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,6 +23,7 @@ export const PrioritizedTasksPage = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [wards, setWards] = useState([]);
+  const [workers, setWorkers] = useState([]);
   const [selectedWard, setSelectedWard] = useState('');
   const [selectedUrgency, setSelectedUrgency] = useState('');
   const [search, setSearch] = useState('');
@@ -28,20 +31,27 @@ export const PrioritizedTasksPage = () => {
   const [recalculating, setRecalculating] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Dispatch Modal state
+  const [dispatchTaskModal, setDispatchTaskModal] = useState(null);
+  const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [dispatchSubmitting, setDispatchSubmitting] = useState(false);
+
   const loadPrioritizedTasks = async (isManualRecalc = false) => {
     if (isManualRecalc) setRecalculating(true);
     else setLoading(true);
 
     try {
-      const [res, wardsRes] = await Promise.all([
+      const [res, wardsRes, workersRes] = await Promise.all([
         api.getPrioritizedTasks({
           wardId: selectedWard || undefined,
           urgency: selectedUrgency || undefined,
         }),
-        api.getWards(),
+        api.getWards().catch(() => []),
+        api.getWorkers().catch(() => []),
       ]);
       setTasks(res.tasks || []);
       setWards(wardsRes || []);
+      setWorkers(workersRes || []);
 
       if (isManualRecalc) {
         setToast(`Collection priorities updated for ${res.tasks.length} bins!`);
@@ -60,17 +70,29 @@ export const PrioritizedTasksPage = () => {
     loadPrioritizedTasks();
   }, [selectedWard, selectedUrgency]);
 
-  const handleDispatchTask = async (task) => {
+  const handleOpenDispatch = (task) => {
+    setDispatchTaskModal(task);
+    setSelectedWorkerId('');
+  };
+
+  const handleConfirmDispatch = async (e) => {
+    e.preventDefault();
+    if (!dispatchTaskModal) return;
+    setDispatchSubmitting(true);
     try {
       await api.createTask({
-        binId: task.bin_id,
-        priority: task.priority_category ? task.priority_category.toUpperCase() : 'HIGH',
-        notes: `Dispatched from Priority Rank #${task.rank || 1} (Score: ${Math.round(task.priority_score || 0)})`,
+        binId: dispatchTaskModal.bin_id,
+        assignedWorkerId: selectedWorkerId || undefined,
+        taskPriority: dispatchTaskModal.priority_category ? dispatchTaskModal.priority_category.toLowerCase() : 'high',
+        notes: `Dispatched from Priority Rank #${dispatchTaskModal.rank || 1} (Score: ${Math.round(dispatchTaskModal.priority_score || 0)})`,
       });
-      setToast(`Task created for ${task.bin_code}! Assigned to field collection queue.`);
+      setToast(`Task created for ${dispatchTaskModal.bin_code}! Assigned to field queue.`);
+      setDispatchTaskModal(null);
       setTimeout(() => setToast(null), 4000);
     } catch (err) {
       alert(`Failed to dispatch task: ${err.message}`);
+    } finally {
+      setDispatchSubmitting(false);
     }
   };
 
@@ -151,7 +173,7 @@ export const PrioritizedTasksPage = () => {
               <option value="">All Wards in Nashik</option>
               {wards.map((w) => (
                 <option key={w.id} value={w.id}>
-                  Ward {w.number}: {w.name}
+                  {w.name} ({w.zone})
                 </option>
               ))}
             </select>
@@ -236,7 +258,7 @@ export const PrioritizedTasksPage = () => {
                       <Button
                         variant="outline"
                         size="xs"
-                        onClick={() => handleDispatchTask(task)}
+                        onClick={() => handleOpenDispatch(task)}
                         icon={<Send className="w-3.5 h-3.5" />}
                       >
                         Dispatch Task
@@ -249,6 +271,55 @@ export const PrioritizedTasksPage = () => {
           </table>
         </div>
       </Card>
+
+      {/* Dispatch Modal with Worker Assignment */}
+      <Modal
+        isOpen={!!dispatchTaskModal}
+        onClose={() => setDispatchTaskModal(null)}
+        title={`Dispatch Priority Task #${dispatchTaskModal?.rank}: ${dispatchTaskModal?.bin_code}`}
+      >
+        <form onSubmit={handleConfirmDispatch} className="space-y-4 text-xs">
+          <div>
+            <span className="text-slate-500 block mb-1 font-semibold">Target Bin Receptacle:</span>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="font-bold text-slate-900 text-sm">{dispatchTaskModal?.bin_code} — {dispatchTaskModal?.bin_name}</div>
+              <div className="text-slate-600 mt-1">
+                Ward: {dispatchTaskModal?.ward_name} • Priority Score: {Math.round(dispatchTaskModal?.priority_score || 0)} ({dispatchTaskModal?.priority_category})
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 font-semibold mb-1">
+              Assign Field Driver (Optional)
+            </label>
+            <select
+              value={selectedWorkerId}
+              onChange={(e) => setSelectedWorkerId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+            >
+              <option value="">Unassigned (Open Dispatch Pool)</option>
+              {workers.map((w) => (
+                <option key={w.id} value={w.userId || w.id}>
+                  {w.user?.name || w.workerId} ({w.workerId}) — {w.vehicleType || 'compactor'}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">
+              If left unassigned, any authorized municipal driver can accept the task from their queue.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button variant="outline" size="sm" onClick={() => setDispatchTaskModal(null)} type="button">
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" type="submit" isLoading={dispatchSubmitting}>
+              Confirm Dispatch
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
