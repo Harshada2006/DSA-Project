@@ -3,9 +3,24 @@ import { prisma } from '../database/client.js';
 export class FacilityService {
   async getFacilities(filters = {}) {
     const where = {};
-    if (filters.facilityType) where.facilityType = filters.facilityType;
-    if (filters.verificationStatus) where.verificationStatus = filters.verificationStatus;
-    if (filters.wasteType) where.wasteType = filters.wasteType;
+    if (filters.facilityType) {
+      const ft = filters.facilityType.toLowerCase();
+      if (ft === 'recycler' || ft === 'verified_ewaste_recycler') {
+        where.facilityType = { in: ['verified_ewaste_recycler', 'ewaste_refurbisher'] };
+      } else {
+        where.facilityType = filters.facilityType;
+      }
+    }
+    if (filters.verificationStatus) {
+      where.verificationStatus = filters.verificationStatus;
+    }
+    if (filters.wasteType) {
+      where.acceptedWasteCategories = { contains: filters.wasteType };
+    }
+    if (filters.excludeScrapDealers === 'true' || filters.verifiedRecyclerOnly === 'true') {
+      where.facilityType = { in: ['verified_ewaste_recycler', 'ewaste_refurbisher'] };
+      where.verificationStatus = 'verified';
+    }
 
     return await prisma.facility.findMany({
       where,

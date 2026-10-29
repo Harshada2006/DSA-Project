@@ -24,6 +24,16 @@ router.post('/', authenticate, authorize('ORGANIZATION_ADMIN'), async (req, res)
   }
 });
 
+// Admin Only: Assign or reassign worker to task
+router.patch('/:id/assign', authenticate, authorize('ORGANIZATION_ADMIN'), async (req, res) => {
+  try {
+    const task = await taskService.assignTask(req.params.id, req.body, req.user, req);
+    res.json({ success: true, data: task });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // Worker: Start task
 router.post('/:id/start', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
   try {
