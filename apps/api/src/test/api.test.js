@@ -9,6 +9,7 @@ import { ewasteService } from '../services/ewasteService.js';
 import { taskService } from '../services/taskService.js';
 import { issueService } from '../services/issueService.js';
 import { predictionService } from '../services/predictionService.js';
+import { facilityService } from '../services/facilityService.js';
 import { analyticsService } from '../services/analyticsService.js';
 
 let passed = 0;
@@ -20,7 +21,7 @@ async function test(name, fn) {
     console.log(`  ✓ ${name}`);
     passed++;
   } catch (err) {
-    console.error(`  ✗ ${name}:`, err.message);
+    console.error(`  ✗ ${name}:`, err.stack || err.message);
     failed++;
   }
 }
@@ -42,6 +43,96 @@ async function runTests() {
     assert.strictEqual(res.reachable, true);
     assert.ok(res.distance_meters > 0);
     assert.ok(res.node_path.length >= 2);
+  });
+
+  await test('C++ Dijkstra Shortest Path: Source Equal to Destination', async () => {
+    const res = await dsaService.getShortestPath('N-CAN', 'N-CAN', false);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.distance_meters, 0);
+    assert.strictEqual(res.total_distance_km, 0);
+    assert.strictEqual(res.node_path.length, 1);
+    assert.strictEqual(res.node_path[0], 'N-CAN');
+    assert.strictEqual(res.coordinate_path.length, 1);
+  });
+
+  await test('C++ Dijkstra Shortest Path: Known Graph Path Reconstruction & Total Distance', async () => {
+    const res = await dsaService.getShortestPath('N-ABB', 'N-CBS', false);
+    assert.strictEqual(res.reachable, true);
+    assert.deepStrictEqual(res.node_path, ['N-ABB', 'N-CAN', 'N-CBS']);
+    assert.strictEqual(res.graph_distance_meters, 3000);
+    assert.ok(res.distance_meters > 0);
+    assert.ok(res.coordinate_path.length >= 3);
+    assert.strictEqual(res.intermediateNodes.length, 3);
+    assert.ok(res.geometry_source === 'osrm' || res.geometry_source === 'graph_nodes_approximate_fallback');
+    for (const coord of res.coordinate_path) {
+      assert.ok(Array.isArray(coord) && coord.length === 2);
+      assert.ok(coord[0] >= 19.0 && coord[0] <= 21.0);
+      assert.ok(coord[1] >= 73.0 && coord[1] <= 75.0);
+    }
+  });
+
+  await test('C++ Dijkstra Shortest Path: Invalid Source or Destination Node Handling', async () => {
+    const res = await dsaService.getShortestPath('NON_EXISTENT_SOURCE', 'N-CBS', false);
+    assert.strictEqual(res.reachable, false);
+    assert.ok(res.error.includes('Node not found') || res.error.includes('Invalid'));
+  });
+
+  await test('C++ Dijkstra Shortest Path: Route Visualization Data Mapping Verification', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'N-BYT', false);
+    assert.strictEqual(res.reachable, true);
+    assert.ok(res.coordinate_path.length >= res.node_path.length);
+    assert.strictEqual(res.intermediateNodes.length, res.node_path.length);
+    for (let i = 0; i < res.node_path.length; i++) {
+      assert.strictEqual(res.intermediateNodes[i].id, res.node_path[i]);
+    }
+    for (const coord of res.coordinate_path) {
+      assert.ok(Array.isArray(coord) && coord.length === 2);
+      assert.ok(coord[0] >= 19.0 && coord[0] <= 21.0);
+      assert.ok(coord[1] >= 73.0 && coord[1] <= 75.0);
+    }
+  });
+
+  await test('C++ Multi-Waypoint Dijkstra Shortest Path (Source -> Intermediate Stop -> Destination)', async () => {
+    // Route from Panchavati (N-PAN) to CBS (N-CBS) with Canada Corner (N-CAN) as intermediate waypoint
+    const res = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, ['N-CAN']);
+    assert.strictEqual(res.reachable, true);
+    assert.ok(res.distance_meters > 0);
+    assert.ok(res.total_distance_km > 0);
+    assert.ok(res.total_duration_minutes > 0);
+    assert.strictEqual(res.stops.length, 3);
+    assert.strictEqual(res.stops[0].type, 'source');
+    assert.strictEqual(res.stops[1].type, 'waypoint');
+    assert.strictEqual(res.stops[2].type, 'destination');
+    assert.strictEqual(res.legs.length, 2);
+    assert.strictEqual(res.legs[0].to, 'N-CAN');
+    assert.strictEqual(res.legs[1].from, 'N-CAN');
+    // Ensure total distance equals sum of leg distances
+    const sumLegDistance = res.legs.reduce((acc, l) => acc + l.distance_meters, 0);
+    assert.strictEqual(res.distance_meters, sumLegDistance);
+    // Ensure node_path includes the waypoint in the correct order
+    const waypointIndex = res.node_path.indexOf('N-CAN');
+    assert.ok(waypointIndex > 0 && waypointIndex < res.node_path.length - 1);
+  });
+
+  await test('C++ Multi-Stop Dijkstra Shortest Path with Multiple Ordered Waypoints', async () => {
+    // Route from N-JEH to N-ABB via N-CBS and N-CAN
+    const res = await dsaService.getShortestPath('N-JEH', 'N-ABB', false, true, ['N-CBS', 'N-CAN']);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.stops.length, 4);
+    assert.strictEqual(res.legs.length, 3);
+    assert.deepStrictEqual(res.stops.map((s) => s.id), ['N-JEH', 'N-CBS', 'N-CAN', 'N-ABB']);
+    assert.strictEqual(res.legs[0].from, 'N-JEH');
+    assert.strictEqual(res.legs[0].to, 'N-CBS');
+    assert.strictEqual(res.legs[1].from, 'N-CBS');
+    assert.strictEqual(res.legs[1].to, 'N-CAN');
+    assert.strictEqual(res.legs[2].from, 'N-CAN');
+    assert.strictEqual(res.legs[2].to, 'N-ABB');
+  });
+
+  await test('C++ Multi-Waypoint Routing: Invalid / Unreachable Stop Handling', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, ['INVALID_STOP_NODE']);
+    assert.strictEqual(res.reachable, false);
+    assert.ok(res.error.includes('Node not found') || res.error.includes('Invalid'));
   });
 
   // 2. Citizen Password Registration, Email Verification & Login (Section 5)
@@ -362,6 +453,300 @@ async function runTests() {
         /already been completed/
       );
     }
+  });
+
+  // 15. Historical Bin Data & Date Filtering Verification
+  await test('Historical Bin Fill Inspection with Date Filtering', async () => {
+    const bin = await prisma.bin.findFirst();
+    assert.ok(bin);
+
+    // Get an existing observation date for this bin
+    const obs = await prisma.binObservation.findFirst({
+      where: { binId: bin.id },
+      orderBy: { observedAt: 'desc' },
+    });
+
+    if (obs) {
+      const dateStr = obs.observedAt.toISOString().slice(0, 10);
+      const binsRes = await binService.getBins({ date: dateStr });
+      assert.ok(binsRes.length > 0);
+      const targetBin = binsRes.find((b) => b.id === bin.id);
+      assert.ok(targetBin);
+      assert.strictEqual(targetBin.isHistorical, true);
+      assert.strictEqual(targetBin.hasHistoricalData, true);
+      assert.ok(typeof targetBin.displayedFillPercentage === 'number');
+
+      // Test bin history for that exact date
+      const historyForDate = await binService.getBinHistory(bin.id, { date: dateStr });
+      assert.strictEqual(historyForDate.selectedDate, dateStr);
+      assert.strictEqual(historyForDate.hasHistoricalDataForDate, true);
+      assert.ok(historyForDate.selectedObservation !== null);
+      assert.ok(typeof historyForDate.currentFillPercentage === 'number');
+    }
+
+    // Test a date far in the future or with no historical observations
+    const noDataDate = '2099-01-01';
+    const futureHistory = await binService.getBinHistory(bin.id, { date: noDataDate });
+    assert.strictEqual(futureHistory.selectedDate, noDataDate);
+    assert.strictEqual(futureHistory.hasHistoricalDataForDate, false);
+    assert.strictEqual(futureHistory.selectedObservation, null);
+    assert.ok(typeof futureHistory.currentFillPercentage === 'number');
+  });
+
+  // 16. Facility Creation with Address Normalization & Validation
+  await test('Facility Creation with Address Normalization & Validation', async () => {
+    // 1. Missing address must fail validation cleanly
+    await assert.rejects(
+      async () => {
+        await facilityService.createFacility({ name: 'Test Facility Missing Address' });
+      },
+      /address is required/i
+    );
+
+    // 2. Normalization of facilityAddress when address field is omitted
+    const created = await facilityService.createFacility({
+      name: 'Nashik Circular Hub Test',
+      facilityAddress: 'Plot 42, MIDC Ambad, Nashik 422010',
+      facilityType: 'RECYCLER',
+      latitude: 19.9385,
+      longitude: 73.7345,
+    });
+    assert.ok(created.id);
+    assert.strictEqual(created.address, 'Plot 42, MIDC Ambad, Nashik 422010');
+    assert.strictEqual(created.verificationStatus, 'unverified');
+
+    // Clean up created test facility
+    await prisma.facility.delete({ where: { id: created.id } }).catch(() => {});
+  });
+
+  // 17. E-Waste Facility Handover Contract Compatibility, Status Transition & Duplicate Prevention
+  await test('E-Waste Facility Handover Contract Compatibility & Duplicate Prevention', async () => {
+    const verifiedRecycler = await prisma.facility.findFirst({
+      where: {
+        verificationStatus: 'verified',
+        facilityType: { in: ['verified_ewaste_recycler', 'recycler', 'RECYCLER'] },
+      },
+    }) || await prisma.facility.findFirst({ where: { verificationStatus: 'verified' } });
+    assert.ok(verifiedRecycler, 'At least one verified recycler facility required in DB');
+
+    // Create a temporary test e-waste request
+    const testEWaste = await prisma.eWasteRequest.create({
+      data: {
+        ticketNo: `EW-TEST-${Date.now()}`,
+        citizenName: 'Pooja Deshmukh',
+        citizenEmail: 'citizen@econexus.gov.in',
+        contactPhone: '+91 98900 12345',
+        pickupAddress: 'MG Road, Shalimar, Nashik',
+        latitude: 19.9928,
+        longitude: 73.7891,
+        itemsDescription: 'Old computer monitor and microwave',
+        approximateQuantity: '2 Large items',
+        estimatedWeightKg: 25.0,
+        status: 'assigned',
+      },
+    });
+
+    try {
+      // 1. Record handover using weightKg and manifestNumber contract aliases
+      const manifestNum = `MNF-TEST-${Date.now().toString().slice(-6)}`;
+      const handoverRes = await ewasteService.recordFacilityHandover({
+        facilityId: verifiedRecycler.id,
+        weightKg: 25.0,
+        manifestNumber: manifestNum,
+        ewasteRequestId: testEWaste.id,
+        notes: 'Handover verification test',
+      });
+
+      assert.ok(handoverRes.id);
+      assert.strictEqual(handoverRes.measuredWeightKg, 25.0);
+      assert.strictEqual(handoverRes.receiptNumber, manifestNum);
+
+      // Verify transaction updated eWasteRequest status to delivered_to_recycler
+      const updatedReq = await prisma.eWasteRequest.findUnique({ where: { id: testEWaste.id } });
+      assert.strictEqual(updatedReq.status, 'delivered_to_recycler');
+      assert.strictEqual(updatedReq.assignedFacilityId, verifiedRecycler.id);
+
+      // 2. Duplicate handover on already delivered request must be rejected
+      await assert.rejects(
+        async () => {
+          await ewasteService.recordFacilityHandover({
+            facilityId: verifiedRecycler.id,
+            weightKg: 25.0,
+            manifestNumber: `MNF-DUP-${Date.now().toString().slice(-6)}`,
+            ewasteRequestId: testEWaste.id,
+          });
+        },
+        /already been delivered/i
+      );
+    } finally {
+      // Clean up test records
+      await prisma.handoverRecord.deleteMany({ where: { ewasteRequestId: testEWaste.id } }).catch(() => {});
+      await prisma.eWasteRequest.delete({ where: { id: testEWaste.id } }).catch(() => {});
+    }
+  });
+
+  // 18. Geographic Bin Filtering, Haversine Distance & Coordinate Validation
+  await test('Geographic Bin Filtering, Haversine Distance & Coordinate Validation', async () => {
+    // 1. Coordinate range validation
+    await assert.rejects(
+      async () => {
+        await binService.getBins({ latitude: 95.0, longitude: 73.7898 });
+      },
+      /invalid geographic coordinates/i
+    );
+
+    // 2. Haversine distance filtering within 2.0 km radius
+    const nearbyBins = await binService.getBins({
+      latitude: 19.9972, // CBS
+      longitude: 73.7845,
+      radiusKm: 2.0,
+    });
+    assert.ok(nearbyBins.length > 0);
+    for (const b of nearbyBins) {
+      assert.ok(b.distanceKm !== null && b.distanceKm <= 2.0);
+    }
+
+    // 3. Zone filtering
+    const northZoneBins = await binService.getBins({ zone: 'North Zone' });
+    assert.ok(northZoneBins.length > 0);
+    for (const b of northZoneBins) {
+      assert.strictEqual(b.ward?.zone, 'North Zone');
+    }
+  });
+
+  // 19. Road-Following Shortest-Path Geometry & Physical Terminal Retention
+  await test('Road-Following Shortest-Path Geometry & Physical Terminal Retention', async () => {
+    const bin = await prisma.bin.findFirst();
+    const facility = await prisma.facility.findFirst({ where: { verificationStatus: 'verified' } });
+    assert.ok(bin && facility);
+
+    const routeRes = await dsaService.getShortestPath(bin.id, facility.id, false);
+    assert.strictEqual(routeRes.reachable, true);
+    assert.ok(routeRes.coordinate_path.length >= 2);
+    assert.ok(routeRes.geometry_source === 'local_edge_geometry' || routeRes.geometry_source === 'osrm');
+
+    // Terminal coordinates should match physical entities
+    const firstCoord = routeRes.coordinate_path[0];
+    const lastCoord = routeRes.coordinate_path[routeRes.coordinate_path.length - 1];
+    assert.ok(Math.abs(firstCoord[0] - bin.latitude) < 0.001);
+    assert.ok(Math.abs(firstCoord[1] - bin.longitude) < 0.001);
+    assert.ok(Math.abs(lastCoord[0] - facility.latitude) < 0.001);
+    assert.ok(Math.abs(lastCoord[1] - facility.longitude) < 0.001);
+
+    // No duplicate consecutive coordinates along the path
+    for (let i = 0; i < routeRes.coordinate_path.length - 1; i++) {
+      const c1 = routeRes.coordinate_path[i];
+      const c2 = routeRes.coordinate_path[i + 1];
+      const isIdentical = c1[0] === c2[0] && c1[1] === c2[1];
+      assert.strictEqual(isIdentical, false, `Duplicate coordinate detected at index ${i}`);
+    }
+  });
+
+  // 20. Road-Following Geometry: Dense Drivable Coordinates & Street Summaries
+  await test('Road-Following Geometry: Dense Drivable Coordinates & Street Summaries', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'N-COL', false);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.geometry_source, 'osrm');
+    assert.strictEqual(res.is_approximate, false);
+    assert.strictEqual(res.routing_provider, 'OSRM (OpenStreetMap Road Network)');
+    assert.ok(res.coordinate_path.length > res.node_path.length * 5, `Expected dense geometry, got ${res.coordinate_path.length} coords for ${res.node_path.length} nodes`);
+    assert.ok(res.legs.length >= 1);
+    assert.ok(res.legs[0].summary && res.legs[0].summary.length > 0);
+    for (const [lat, lng] of res.coordinate_path) {
+      assert.ok(lat >= 19.8 && lat <= 20.2, `Latitude out of bounds: ${lat}`);
+      assert.ok(lng >= 73.6 && lng <= 74.0, `Longitude out of bounds: ${lng}`);
+    }
+  });
+
+  // 21. C++ Authoritative Roadblock Avoidance Forces Detour
+  await test('C++ Dijkstra Authoritative Roadblock Avoidance & Detour Generation', async () => {
+    const edge = await prisma.roadEdge.findFirst({
+      where: {
+        OR: [
+          { sourceNodeId: 'N-ABB', targetNodeId: 'N-CAN' },
+          { sourceNodeId: 'N-CAN', targetNodeId: 'N-ABB' },
+        ],
+      },
+    });
+    assert.ok(edge, 'Edge between N-ABB and N-CAN must exist');
+
+    try {
+      await prisma.roadEdge.update({
+        where: { id: edge.id },
+        data: { isBlocked: true },
+      });
+
+      const detourRes = await dsaService.getShortestPath('N-ABB', 'N-CBS', false, true);
+      assert.strictEqual(detourRes.reachable, true);
+      const directUsed = detourRes.node_path.some((n, idx) => {
+        const next = detourRes.node_path[idx + 1];
+        return (n === 'N-ABB' && next === 'N-CAN') || (n === 'N-CAN' && next === 'N-ABB');
+      });
+      assert.strictEqual(directUsed, false, 'Route must not traverse blocked edge');
+      assert.ok(detourRes.coordinate_path.length > 0);
+    } finally {
+      await prisma.roadEdge.update({
+        where: { id: edge.id },
+        data: { isBlocked: false },
+      });
+    }
+  });
+
+  // 22. C++ Dijkstra One-Way Road Rule Enforcement
+  await test('C++ Dijkstra One-Way Road Rule Enforcement', async () => {
+    const edge = await prisma.roadEdge.findFirst({
+      where: { sourceNodeId: 'N-CAN', targetNodeId: 'N-ABB' },
+    });
+    assert.ok(edge);
+
+    try {
+      await prisma.roadEdge.update({
+        where: { id: edge.id },
+        data: { oneWay: true },
+      });
+
+      // Forward direction (N-CAN -> N-ABB) along one-way edge must succeed
+      const fwd = await dsaService.getShortestPath('N-CAN', 'N-ABB', false);
+      assert.strictEqual(fwd.reachable, true);
+      assert.strictEqual(fwd.node_path[0], 'N-CAN');
+      assert.strictEqual(fwd.node_path[fwd.node_path.length - 1], 'N-ABB');
+
+      // Reverse direction (N-ABB -> N-CAN) must NOT traverse direct backward step on this one-way edge
+      const rev = await dsaService.getShortestPath('N-ABB', 'N-CAN', false);
+      if (rev.reachable) {
+        const backwardDirect = rev.node_path.some((n, idx) => n === 'N-ABB' && rev.node_path[idx + 1] === 'N-CAN');
+        assert.strictEqual(backwardDirect, false, 'One-way restriction violated: traversed against one-way flow');
+      }
+    } finally {
+      await prisma.roadEdge.update({
+        where: { id: edge.id },
+        data: { oneWay: false },
+      });
+    }
+  });
+
+  // 23. Graceful Fallback on OSRM Provider Failure / Timeout
+  await test('Graceful Fallback on OSRM Provider Failure or Offline', async () => {
+    const prevEnabled = process.env.OSRM_ENABLED;
+    try {
+      process.env.OSRM_ENABLED = 'false';
+      const fallbackRes = await dsaService.getShortestPath('N-ABB', 'N-CBS', false);
+      assert.strictEqual(fallbackRes.reachable, true);
+      assert.strictEqual(fallbackRes.is_approximate, true);
+      assert.strictEqual(fallbackRes.geometry_source, 'graph_nodes_approximate_fallback');
+      assert.ok(fallbackRes.routing_message && fallbackRes.routing_message.includes('approximate'));
+      assert.strictEqual(fallbackRes.distance_meters, fallbackRes.graph_distance_meters);
+      assert.strictEqual(fallbackRes.coordinate_path.length, fallbackRes.intermediateNodes.length);
+    } finally {
+      process.env.OSRM_ENABLED = prevEnabled;
+    }
+  });
+
+  // 24. Inaccessible Destination Error Handling
+  await test('Inaccessible or Disconnected Node Handling', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'UNKNOWN_NODE_999', false);
+    assert.strictEqual(res.reachable, false);
+    assert.ok(res.error && res.error.length > 0);
   });
 
   console.log('====================================================');

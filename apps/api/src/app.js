@@ -50,6 +50,7 @@ app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/wards', wardRoutes);
 app.use('/api/v1/issues', issueRoutes);
+app.use('/api/v1/roadblocks', issueRoutes);
 
 // Global 404 Handler
 app.use((_req, res) => {

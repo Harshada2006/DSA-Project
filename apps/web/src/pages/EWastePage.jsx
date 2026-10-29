@@ -76,7 +76,14 @@ export const EWastePage = () => {
     e.preventDefault();
     setHandoverSubmitting(true);
     try {
-      await api.recordEWasteHandover(handoverForm);
+      await api.recordEWasteHandover({
+        ...handoverForm,
+        measuredWeightKg: handoverForm.weightKg,
+        weightKg: handoverForm.weightKg,
+        receiptNumber: handoverForm.manifestNumber,
+        manifestNumber: handoverForm.manifestNumber,
+        ewasteRequestId: handoverForm.ewasteRequestId || undefined,
+      });
       showToast('success', 'Handover record and facility manifest successfully logged!');
       setIsHandoverOpen(false);
       loadData();

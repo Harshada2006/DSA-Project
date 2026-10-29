@@ -164,7 +164,7 @@ export class EWasteService {
    * MODULE 4: Field Doorstep Collection Verification
    * Worker confirms pickup, measured weight, and updates status
    * ============================================================ */
-  async recordWorkerCollection(requestId, collectionData, workerUser, req) {
+  async recordWorkerCollection(requestId, collectionData = {}, workerUser, req) {
     const request = await prisma.eWasteRequest.findUnique({ where: { id: requestId } });
     if (!request) throw new Error('E-waste request not found.');
 
@@ -172,7 +172,13 @@ export class EWasteService {
       throw new Error('Access denied: You can only update e-waste tasks assigned to you.');
     }
 
-    const { measuredWeightKg, resolutionNotes } = collectionData;
+    const currentStatus = (request.status || '').toLowerCase();
+    if (currentStatus === 'delivered_to_recycler') {
+      throw new Error('This e-waste request has already been handed over to a verified recycler.');
+    }
+
+    const rawWeight = collectionData.measuredWeightKg ?? collectionData.actualWeightKg ?? collectionData.weightKg;
+    const notes = collectionData.resolutionNotes ?? collectionData.notes;
 
     const updated = await prisma.eWasteRequest.update({
       where: { id: requestId },
@@ -180,8 +186,8 @@ export class EWasteService {
         status: 'collected',
         collectionDate: new Date(),
         assignedWorkerId: workerUser.id,
-        estimatedWeightKg: measuredWeightKg ? parseFloat(measuredWeightKg) : request.estimatedWeightKg,
-        resolutionNotes: resolutionNotes || `Collected by ${workerUser.name}. Ready for recycler handover.`,
+        estimatedWeightKg: rawWeight !== undefined && rawWeight !== null ? parseFloat(rawWeight) : request.estimatedWeightKg,
+        resolutionNotes: notes || `Collected by ${workerUser.name}. Ready for recycler handover.`,
       },
     });
 
@@ -190,7 +196,7 @@ export class EWasteService {
       action: 'EWASTE_COLLECTION_RECORDED',
       resource: 'EWasteRequest',
       resourceId: requestId,
-      details: { measuredWeightKg, status: 'collected' },
+      details: { measuredWeightKg: rawWeight, status: 'collected' },
       req,
     });
 
@@ -205,13 +211,19 @@ export class EWasteService {
     const {
       facilityId,
       ewasteRequestId,
-      measuredWeightKg,
-      receiptNumber,
       notes,
     } = handoverData;
 
-    if (!facilityId || !measuredWeightKg) {
-      throw new Error('Destination facility and measured weight (kg) are required.');
+    const rawWeight = handoverData.measuredWeightKg ?? handoverData.weightKg ?? handoverData.actualWeightKg;
+    const rawReceipt = handoverData.receiptNumber ?? handoverData.manifestNumber ?? handoverData.certificateNumber;
+
+    if (!facilityId) {
+      throw new Error('Destination facility is required.');
+    }
+
+    const weight = parseFloat(rawWeight);
+    if (isNaN(weight) || weight <= 0) {
+      throw new Error('Destination facility and valid measured weight (kg) are required.');
     }
 
     const facility = await prisma.facility.findUnique({ where: { id: facilityId } });
@@ -222,41 +234,58 @@ export class EWasteService {
       throw new Error('General scrap dealers cannot be selected as authorized e-waste destinations.');
     }
 
-    const handover = await prisma.handoverRecord.create({
-      data: {
-        facilityId,
-        ewasteRequestId: ewasteRequestId || null,
-        recordedByWorkerId: user.id,
-        materialCategory: 'e_waste',
-        measuredWeightKg: parseFloat(measuredWeightKg),
-        receiptNumber: receiptNumber || null,
-        notes: notes || null,
-        handoverDate: new Date(),
-        provenance: 'observed',
-      },
-      include: { facility: true },
-    });
-
-    // Update e-waste request status to completed / delivered
+    let targetRequest = null;
     if (ewasteRequestId) {
-      await prisma.eWasteRequest.update({
-        where: { id: ewasteRequestId },
-        data: {
-          status: 'delivered_to_recycler',
-          assignedFacilityId: facilityId,
-          resolutionNotes: `Delivered to ${facility.name}. Receipt: ${receiptNumber || 'Confirmed by crew'}.`,
-        },
-      });
+      targetRequest = await prisma.eWasteRequest.findUnique({ where: { id: ewasteRequestId } });
+      if (!targetRequest) throw new Error('Referenced e-waste request not found.');
+      const reqStatus = (targetRequest.status || '').toLowerCase();
+      if (reqStatus === 'delivered_to_recycler') {
+        throw new Error('This e-waste request has already been delivered to a verified recycler.');
+      }
     }
 
-    await logAuditEvent({
-      userId: user.id,
-      action: 'EWASTE_FACILITY_HANDOVER_RECORDED',
-      resource: 'HandoverRecord',
-      resourceId: handover.id,
-      details: { facilityName: facility.name, weightKg: measuredWeightKg },
-      req,
-    });
+    const workerId = user?.id || (await prisma.user.findFirst({ where: { role: 'worker' } }))?.id || 'worker-system';
+
+    // Execute handover and status update in a transaction
+    const [handover] = await prisma.$transaction([
+      prisma.handoverRecord.create({
+        data: {
+          facilityId,
+          ewasteRequestId: ewasteRequestId || null,
+          recordedByWorkerId: workerId,
+          materialCategory: 'e_waste',
+          measuredWeightKg: weight,
+          receiptNumber: rawReceipt ? String(rawReceipt).trim() : null,
+          notes: notes ? String(notes).trim() : null,
+          handoverDate: new Date(),
+          provenance: 'observed',
+        },
+        include: { facility: true },
+      }),
+      ...(ewasteRequestId
+        ? [
+            prisma.eWasteRequest.update({
+              where: { id: ewasteRequestId },
+              data: {
+                status: 'delivered_to_recycler',
+                assignedFacilityId: facilityId,
+                resolutionNotes: `Delivered to ${facility.name}. Receipt/Manifest: ${rawReceipt || 'Confirmed by crew'}.`,
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    if (user?.id) {
+      await logAuditEvent({
+        userId: user.id,
+        action: 'EWASTE_FACILITY_HANDOVER_RECORDED',
+        resource: 'HandoverRecord',
+        resourceId: handover.id,
+        details: { facilityName: facility.name, weightKg: weight, ewasteRequestId },
+        req,
+      });
+    }
 
     return handover;
   }

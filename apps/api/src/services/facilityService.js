@@ -5,6 +5,7 @@ export class FacilityService {
     const where = {};
     if (filters.facilityType) where.facilityType = filters.facilityType;
     if (filters.verificationStatus) where.verificationStatus = filters.verificationStatus;
+    if (filters.wasteType) where.wasteType = filters.wasteType;
 
     return await prisma.facility.findMany({
       where,
@@ -33,11 +34,20 @@ export class FacilityService {
   }
 
   async createFacility(data) {
+    if (!data || !data.name || !data.name.trim()) {
+      throw new Error('Facility name is required.');
+    }
+
+    const rawAddress = data.address || data.facilityAddress || data.businessAddress;
+    if (!rawAddress || typeof rawAddress !== 'string' || !rawAddress.trim()) {
+      throw new Error('Facility address is required.');
+    }
+
     return await prisma.facility.create({
       data: {
         name: data.name.trim(),
         facilityType: data.facilityType || 'verified_ewaste_recycler',
-        address: data.address.trim(),
+        address: rawAddress.trim(),
         latitude: parseFloat(data.latitude) || 19.9975,
         longitude: parseFloat(data.longitude) || 73.7898,
         acceptedWasteCategories: typeof data.acceptedWasteCategories === 'string'
@@ -45,7 +55,7 @@ export class FacilityService {
           : JSON.stringify(data.acceptedWasteCategories || ['electronic']),
         authorizationNumber: data.authorizationNumber || null,
         authorizationValidUntil: data.authorizationValidUntil ? new Date(data.authorizationValidUntil) : null,
-        verificationStatus: data.verificationStatus || 'verified',
+        verificationStatus: data.verificationStatus || 'unverified',
         sourceOrganization: data.sourceOrganization || 'Maharashtra Pollution Control Board (MPCB)',
         sourceUrl: data.sourceUrl || null,
         contactPerson: data.contactPerson || null,

@@ -20,15 +20,26 @@ router.post('/dsa/prioritize', authenticate, authorize('ORGANIZATION_ADMIN', 'WO
   }
 });
 
-// C++ Dijkstra Shortest Path
+// Road Network Nodes for Dijkstra Shortest-Path Planning
+router.get('/dsa/nodes', authenticate, authorize('ORGANIZATION_ADMIN', 'WORKER'), async (_req, res) => {
+  try {
+    const nodes = await dsaService.getRoadNodes();
+    res.json({ success: true, count: nodes.length, data: nodes });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// C++ Dijkstra Shortest Path with Waypoints / Intermediate Stops
 router.post('/dsa/shortest-path', authenticate, authorize('ORGANIZATION_ADMIN', 'WORKER'), async (req, res) => {
   try {
-    const { sourceId, targetId, useTime } = req.body;
+    const { sourceId, targetId, intermediateStops, stops, useTime, avoidBlocked } = req.body;
     if (!sourceId || !targetId) {
       return res.status(400).json({ success: false, error: 'sourceId and targetId are required.' });
     }
-    const result = await dsaService.getShortestPath(sourceId, targetId, useTime);
-    res.json({ success: result.reachable !== false, data: result });
+    const waypoints = Array.isArray(intermediateStops) ? intermediateStops : (Array.isArray(stops) ? stops : []);
+    const result = await dsaService.getShortestPath(sourceId, targetId, !!useTime, avoidBlocked !== false, waypoints);
+    res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

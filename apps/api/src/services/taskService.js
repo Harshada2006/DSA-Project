@@ -22,9 +22,12 @@ export class TaskService {
   async getTasks(user, filters = {}) {
     const where = {};
 
-    // Workers only see their assigned tasks
+    // Workers see their assigned tasks or unassigned pending tasks
     if (user.role === 'WORKER') {
-      where.assignedWorkerId = user.id;
+      where.OR = [
+        { assignedWorkerId: user.id },
+        { assignedWorkerId: null, status: 'pending' },
+      ];
     } else if (filters.workerId) {
       where.assignedWorkerId = filters.workerId;
     }
@@ -93,7 +96,7 @@ export class TaskService {
     const task = await prisma.collectionTask.findUnique({ where: { id: taskId } });
     if (!task) throw new Error('Task not found.');
 
-    if (workerUser.role === 'WORKER' && task.assignedWorkerId !== workerUser.id) {
+    if (workerUser.role === 'WORKER' && task.assignedWorkerId && task.assignedWorkerId !== workerUser.id) {
       throw new Error('Access denied: You can only update tasks assigned to your worker profile.');
     }
 
@@ -102,6 +105,7 @@ export class TaskService {
       data: {
         status: 'started',
         startedAt: new Date(),
+        assignedWorkerId: task.assignedWorkerId || workerUser.id,
       },
       include: { bin: true },
     });
@@ -122,23 +126,28 @@ export class TaskService {
       throw new Error('Task has already been completed and collected.');
     }
 
-    if (workerUser.role === 'WORKER' && task.assignedWorkerId !== workerUser.id) {
+    if (workerUser.role === 'WORKER' && task.assignedWorkerId && task.assignedWorkerId !== workerUser.id) {
       throw new Error('Access denied: You can only record collections for your assigned tasks.');
     }
 
     const {
       observedFillAfter = 0.0,
-      collectedWeightKg = 0.0,
+      collectedWeightKg,
+      weightKg,
       notes = '',
       photoEvidenceUrl = null,
       gpsLat = null,
+      latitude = null,
       gpsLng = null,
+      longitude = null,
     } = collectionData;
 
     const now = new Date();
     const fillBefore = task.bin.currentFillPercentage;
     const fillAfter = Math.max(0.0, Math.min(100.0, parseFloat(observedFillAfter)));
-    const actualWeight = parseFloat(collectedWeightKg) || Math.round(((fillBefore - fillAfter) / 100.0) * (task.bin.capacityLiters * 0.35));
+    const actualWeight = parseFloat(collectedWeightKg ?? weightKg) || Math.round(((fillBefore - fillAfter) / 100.0) * (task.bin.capacityLiters * 0.35)) || 50;
+    const finalGpsLat = (gpsLat ?? latitude) ? parseFloat(gpsLat ?? latitude) : null;
+    const finalGpsLng = (gpsLng ?? longitude) ? parseFloat(gpsLng ?? longitude) : null;
 
     const [updatedTask] = await prisma.$transaction([
       prisma.collectionTask.update({
@@ -146,12 +155,13 @@ export class TaskService {
         data: {
           status: 'collected',
           completedAt: now,
+          assignedWorkerId: task.assignedWorkerId || workerUser.id,
           observedFill: fillAfter,
           collectedWeightKg: actualWeight,
           notes: notes || null,
           photoEvidenceUrl: photoEvidenceUrl || null,
-          workerGpsLat: gpsLat ? parseFloat(gpsLat) : null,
-          workerGpsLng: gpsLng ? parseFloat(gpsLng) : null,
+          workerGpsLat: finalGpsLat,
+          workerGpsLng: finalGpsLng,
         },
       }),
       prisma.collectionEvent.create({
@@ -174,6 +184,16 @@ export class TaskService {
           lastObservedAt: now,
           status: 'active',
           urgency: 'normal',
+        },
+      }),
+      prisma.binObservation.create({
+        data: {
+          binId: task.binId,
+          fillPercentage: fillAfter,
+          observedAt: now,
+          observerType: 'manual_inspection',
+          provenance: 'observed',
+          notes: `Post-collection observation by ${workerUser.name}.`,
         },
       }),
     ]);

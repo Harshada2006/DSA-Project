@@ -418,12 +418,26 @@ export class AuthService {
 
     const cleanIdentifier = workerIdOrEmail.trim();
 
-    // Find worker profile strictly by Worker ID (e.g. WRK-NSK-101) or registered work email
+    // Support flexible identifier matching: full ID (WRK-NSK-101), numeric ID (101), email, or username (worker1)
+    const possibleWorkerIds = [cleanIdentifier.toUpperCase()];
+    const digitsMatch = cleanIdentifier.match(/\d+$/);
+    if (digitsMatch) {
+      const num = digitsMatch[0].padStart(3, '0');
+      possibleWorkerIds.push(`WRK-NSK-${num}`);
+      possibleWorkerIds.push(`WRK-${num}`);
+    }
+
+    const possibleEmails = [cleanIdentifier.toLowerCase()];
+    if (!cleanIdentifier.includes('@')) {
+      possibleEmails.push(`${cleanIdentifier.toLowerCase()}@econexus.gov.in`);
+    }
+
+    // Find worker profile by Worker ID or registered work email
     const workerProfile = await prisma.workerProfile.findFirst({
       where: {
         OR: [
-          { workerId: cleanIdentifier.toUpperCase() },
-          { user: { email: cleanIdentifier.toLowerCase() } },
+          { workerId: { in: possibleWorkerIds } },
+          { user: { email: { in: possibleEmails } } },
         ],
       },
       include: {
@@ -476,6 +490,12 @@ export class AuthService {
         organizationName: workerProfile.organization?.name || 'Nashik Municipal Corporation',
         assignedWard: workerProfile.assignedWard,
         vehicleType: workerProfile.vehicleType,
+        workerProfile: {
+          id: workerProfile.id,
+          workerId: workerProfile.workerId,
+          assignedWard: workerProfile.assignedWard,
+          vehicleType: workerProfile.vehicleType,
+        },
       },
     };
   }

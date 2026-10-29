@@ -129,6 +129,63 @@ const translations = {
     expected_fill: 'Expected Fill Level Tomorrow',
     predicted_overflow: 'Predicted Overflow Risk',
     statistical_estimate: 'Statistical Prediction (Non-Sensor)',
+
+    // Route Planning & Intermediate Stops
+    route_planner_title: 'Road Shortest Path (Dijkstra)',
+    source_location: 'Source Location (Start Point A)',
+    destination_location: 'Destination Location (Target Point B)',
+    intermediate_stops: 'Intermediate Stops & Waypoints',
+    add_stop: 'Add Intermediate Stop',
+    remove_stop: 'Remove Stop',
+    move_up: 'Move Up',
+    move_down: 'Move Down',
+    find_route: 'Find Route',
+    clear_route: 'Clear Route',
+    total_distance: 'Total Distance',
+    est_travel_time: 'Est. Travel Time',
+    avoid_roadblocks: 'Avoid Reported Road Closures',
+    no_route_found: 'No road route found between the selected locations. Please check road network connectivity.',
+    route_empty_state: 'Select source and destination, then click Find Route to compute shortest road path.',
+    turn_by_turn: 'Turn-by-Turn Road Route',
+
+    // Bin History & Inspection
+    historical_inspection: 'Historical Fill-Level & Date Inspection',
+    historical_date_picker: 'Inspection Date Picker',
+    current_status_live: 'Current Status (Live)',
+    historical_status_on: 'Historical Status on',
+    no_historical_data: 'No historical data available for the selected date.',
+    historical_filter: 'Historical Date Filter',
+    all_dates: 'Live / All Dates',
+
+    // Worker Collection
+    log_collection_title: 'Record Bin Waste Collection',
+    select_assigned_bin: 'Select Assigned Bin Receptacle',
+    net_weight_collected: 'Net Collected Waste Weight (kg)',
+    confirm_collected_checkbox: 'I confirm that this receptacle was emptied into the compaction vehicle.',
+    gps_presence_consent: 'Include worker GPS presence verification',
+    submit_collection: 'Submit Collection Record',
+    collection_saved_success: 'Collection recorded successfully! Bin reset to 0%.',
+    already_collected: 'Task Already Collected (Completed)',
+
+    // E-Waste Handover
+    ewaste_handover_title: 'E-Waste Handover to Recycler',
+    assigned_ewaste_pickups: 'Assigned Residential E-Waste Pickups',
+    destination_facility: 'Select Destination Facility',
+    batch_weight: 'Total Batch Weight (kg)',
+    item_count: 'Item Count',
+    manifest_no: 'Manifest Number',
+    certificate_no: 'Transfer Certificate #',
+    archive_handover: 'Archive Handover & Issue Manifest',
+    handover_success: 'E-Waste batch successfully transferred to certified recycler.',
+
+    // Field Hazard
+    report_hazard_btn: 'Report Field Hazard / Roadblock',
+    hazard_modal_title: 'Report Field Hazard or Roadblock',
+    issue_type: 'Issue Type',
+    street_name: 'Street / Road Name',
+    location_landmark: 'Location / Landmark',
+    obstacle_desc: 'Description of Obstacle',
+    submit_hazard: 'Submit Roadblock Notice',
   },
 
   mr: {
@@ -259,6 +316,63 @@ const translations = {
     expected_fill: 'उद्याची अपेक्षित भरलेली पातळी',
     predicted_overflow: 'ओव्हरफ्लो होण्याचा अंदाज',
     statistical_estimate: 'सांख्यिकी मॉडेल अंदाज (सेन्सर रहित)',
+
+    // Route Planning & Intermediate Stops
+    route_planner_title: 'रस्ता नेटवर्क सर्वात लहान मार्ग (डाइकस्ट्रा)',
+    source_location: 'प्रारंभिक स्थान (पॉइंट A)',
+    destination_location: 'गंतव्य स्थान (पॉइंट B)',
+    intermediate_stops: 'मध्यवर्ती थांबे व वेपॉइंट्स',
+    add_stop: 'मध्यवर्ती थांबा जोडा',
+    remove_stop: 'थांबा काढा',
+    move_up: 'वर हलवा',
+    move_down: 'खाली हलवा',
+    find_route: 'मार्ग शोधा',
+    clear_route: 'मार्ग साफ करा',
+    total_distance: 'एकूण अंतर',
+    est_travel_time: 'अपेक्षित प्रवासाची वेळ',
+    avoid_roadblocks: 'बंद असलेले रस्ते टाळा',
+    no_route_found: 'निवडलेल्या ठिकाणांदरम्यान रस्ता मार्ग सापडला नाही. रस्ता जोडणी तपासा किंवा दुसरे ठिकाण निवडा.',
+    route_empty_state: 'प्रारंभ आणि गंतव्य स्थान निवडा, नंतर सर्वात लहान रस्ता मार्ग काढण्यासाठी "मार्ग शोधा" वर क्लिक करा.',
+    turn_by_turn: 'वळणावळणाचा तपशीलवार रस्ता मार्ग',
+
+    // Bin History & Inspection
+    historical_inspection: 'ऐतिहासिक भराव पातळी व तारीख तपासणी',
+    historical_date_picker: 'तपासणी तारीख निवडा',
+    current_status_live: 'सध्याची स्थिती (थेट)',
+    historical_status_on: 'या तारखेची ऐतिहासिक स्थिती:',
+    no_historical_data: 'निवडलेल्या तारखेसाठी कोणतीही ऐतिहासिक नोंद उपलब्ध नाही.',
+    historical_filter: 'ऐतिहासिक तारीख फिल्टर',
+    all_dates: 'थेट / सर्व तारखा',
+
+    // Worker Collection
+    log_collection_title: 'कचरा उचल नोंदवा',
+    select_assigned_bin: 'नेमून दिलेली कचराकुंडी निवडा',
+    net_weight_collected: 'उचललेला निव्वळ कचरा वजन (किलो)',
+    confirm_collected_checkbox: 'मी खात्री करतो/करते की ही कुंडी कचरा गाडीत रिकामी करण्यात आली आहे.',
+    gps_presence_consent: 'कर्मचाऱ्याचे जीपीएस स्थान पडताळणी समाविष्ट करा',
+    submit_collection: 'कचरा उचल नोंद सबमिट करा',
+    collection_saved_success: 'कचरा उचल यशस्वीरीत्या नोंदवली गेली! कुंडी ०% वर रीसेट झाली.',
+    already_collected: 'कार्य आधीच पूर्ण झाले आहे (एकत्रित)',
+
+    // E-Waste Handover
+    ewaste_handover_title: 'पुनर्चक्रण केंद्राकडे ई-कचरा हस्तांतरण',
+    assigned_ewaste_pickups: 'घरोघरी नेमून दिलेली ई-कचरा उचल',
+    destination_facility: 'अधिकृत पुनर्चक्रण केंद्र निवडा',
+    batch_weight: 'एकूण लॉट वजन (किलो)',
+    item_count: 'वस्तूंची संख्या',
+    manifest_no: 'मॅनिफेस्ट क्रमांक',
+    certificate_no: 'हस्तांतरण प्रमाणपत्र क्रमांक',
+    archive_handover: 'हस्तांतरण नोंदवून मॅनिफेस्ट जारी करा',
+    handover_success: 'ई-कचरा लॉट अधिकृत पुनर्चक्रण केंद्राकडे यशस्वीरीत्या हस्तांतरित करण्यात आला.',
+
+    // Field Hazard
+    report_hazard_btn: 'रस्त्यावरील अडथळा किंवा धोका नोंदवा',
+    hazard_modal_title: 'रस्त्यावरील अडथळा किंवा धोक्याची नोंद',
+    issue_type: 'समस्येचा प्रकार',
+    street_name: 'रस्त्याचे नाव',
+    location_landmark: 'ठिकाण / लँडमार्क',
+    obstacle_desc: 'अडथळ्याचे सविस्तर वर्णन',
+    submit_hazard: 'अडथळा सूचना सबमिट करा',
   },
 
   hi: {
@@ -389,6 +503,63 @@ const translations = {
     expected_fill: 'कल का अनुमानित भराव स्तर',
     predicted_overflow: 'अनुमानित ओवरफ्लो जोखिम',
     statistical_estimate: 'सांख्यिकीय मॉडल अनुमान (सेंसर रहित)',
+
+    // Route Planning & Intermediate Stops
+    route_planner_title: 'सड़क नेटवर्क न्यूनतम दूरी मार्ग (डिजक्स्ट्रा)',
+    source_location: 'प्रारंभिक स्थल (बिंदु A)',
+    destination_location: 'गंतव्य स्थल (बिंदु B)',
+    intermediate_stops: 'मध्यवर्ती पड़ाव एवं वेपॉइंट्स',
+    add_stop: 'मध्यवर्ती पड़ाव जोड़ें',
+    remove_stop: 'पड़ाव हटाएं',
+    move_up: 'ऊपर करें',
+    move_down: 'नीचे करें',
+    find_route: 'मार्ग खोजें',
+    clear_route: 'मार्ग साफ़ करें',
+    total_distance: 'कुल दूरी',
+    est_travel_time: 'अनुमानित यात्रा समय',
+    avoid_roadblocks: 'अवरुद्ध सड़कों से बचें',
+    no_route_found: 'चुने गए स्थानों के बीच कोई सड़क मार्ग नहीं मिला। सड़क कनेक्टिविटी जांचें या अन्य गंतव्य चुनें।',
+    route_empty_state: 'प्रारंभ और गंतव्य चुनें, फिर न्यूनतम दूरी सड़क मार्ग के लिए "मार्ग खोजें" पर क्लिक करें।',
+    turn_by_turn: 'मोड़-दर-मोड़ सड़क मार्ग विवरण',
+
+    // Bin History & Inspection
+    historical_inspection: 'ऐतिहासिक भराव स्तर एवं तिथि निरीक्षण',
+    historical_date_picker: 'निरीक्षण तिथि चुनें',
+    current_status_live: 'वर्तमान स्थिति (लाइव)',
+    historical_status_on: 'इस तिथि की ऐतिहासिक स्थिति:',
+    no_historical_data: 'चुनी गई तिथि के लिए कोई ऐतिहासिक रिकॉर्ड उपलब्ध नहीं है।',
+    historical_filter: 'ऐतिहासिक तिथि फ़िल्टर',
+    all_dates: 'लाइव / सभी तिथियां',
+
+    // Worker Collection
+    log_collection_title: 'कचरा उठाव दर्ज करें',
+    select_assigned_bin: 'आवंटित कचरा पात्र चुनें',
+    net_weight_collected: 'एकत्रित शुद्ध कचरा भार (किलो)',
+    confirm_collected_checkbox: 'मैं पुष्टि करता/करती हूँ कि यह पात्र कचरा वाहन में पूरी तरह खाली कर दिया गया है।',
+    gps_presence_consent: 'सफाई कर्मचारी जीपीएस उपस्थिति सत्यापन शामिल करें',
+    submit_collection: 'कचरा उठाव रिकॉर्ड दर्ज करें',
+    collection_saved_success: 'कचरा उठाव सफलतापूर्वक दर्ज हुआ! पात्र ०% पर रीसेट हो गया।',
+    already_collected: 'कार्य पहले ही पूरा हो चुका है (एकत्रित)',
+
+    // E-Waste Handover
+    ewaste_handover_title: 'रीसाइक्लिंग केंद्र को ई-कचरा सुपुर्दगी',
+    assigned_ewaste_pickups: 'घर-घर से आवंटित ई-कचरा उठाव',
+    destination_facility: 'अधिकृत रीसाइक्लिंग केंद्र चुनें',
+    batch_weight: 'कुल लॉट भार (किलो)',
+    item_count: 'वस्तुओं की संख्या',
+    manifest_no: 'मैनिफ़ेस्ट संख्या',
+    certificate_no: 'हस्तांतरण प्रमाणपत्र सं.',
+    archive_handover: 'हस्तांतरण दर्ज कर मैनिफ़ेस्ट जारी करें',
+    handover_success: 'ई-कचरा लॉट अधिकृत रीसाइक्लिंग केंद्र को सफलतापूर्वक सुपुर्द किया गया।',
+
+    // Field Hazard
+    report_hazard_btn: 'सड़क बाधा या खतरा रिपोर्ट करें',
+    hazard_modal_title: 'सड़क बाधा या खतरे की रिपोर्ट',
+    issue_type: 'समस्या का प्रकार',
+    street_name: 'सड़क का नाम',
+    location_landmark: 'स्थान / लैंडमार्क',
+    obstacle_desc: 'बाधा का विस्तृत विवरण',
+    submit_hazard: 'बाधा सूचना दर्ज करें',
   },
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client.js';
 import { Modal } from '../common/Modal.jsx';
 import { Badge } from '../common/Badge.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 import {
   Calendar,
   Clock,
@@ -25,6 +26,7 @@ import {
 } from 'recharts';
 
 export const BinHistoryModal = ({ isOpen, onClose, bin, allBins = [] }) => {
+  const { t } = useLanguage();
   const [selectedBinId, setSelectedBinId] = useState(bin?.id || '');
   const [historyData, setHistoryData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -173,65 +175,89 @@ export const BinHistoryModal = ({ isOpen, onClose, bin, allBins = [] }) => {
           </div>
         ) : (
           <>
+            {/* Notice when selected historical date has no records */}
+            {!historyData?.hasHistoricalDataForDate && selectedDate && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-2xl text-xs space-y-1">
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{t('no_historical_data', 'No historical data available')} for {selectedDate}</span>
+                </div>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                  {t('current_status_live', 'Current Status (Live)')}: <strong className="font-mono">{Math.round(historyData?.bin?.currentFillPercentage ?? 0)}%</strong> ({historyData?.bin?.urgency?.toUpperCase()} urgency). No observation or sensor reading was registered for the specified date.
+                </p>
+              </div>
+            )}
+
             {/* Observation Card for Selected Date */}
-            {selectedObs && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Inspection Date
+            {historyData?.hasHistoricalDataForDate !== false && selectedObs && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">
+                    {t('historical_status_on', 'Historical Status on')} <span className="font-mono text-emerald-600 dark:text-emerald-400">{selectedObs.date}</span>
                   </span>
-                  <div className="text-base font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    {selectedObs.date}
-                  </div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                    Day-end observation
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {t('current_status_live', 'Current Status (Live)')}: <strong className="font-mono text-slate-900 dark:text-white">{Math.round(historyData?.bin?.currentFillPercentage ?? 0)}%</strong>
                   </span>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Fill Percentage
-                  </span>
-                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5 font-mono">
-                    {Math.round(selectedObs.fillPercentage)}%
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      {t('historical_date_picker', 'Inspection Date')}
+                    </span>
+                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      {selectedObs.date}
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      Day-end observation
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                    ~{selectedObs.estimatedVolumeLitres} Liters accumulated
-                  </span>
-                </div>
 
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Overflow Risk Category
-                  </span>
-                  <div className="mt-1">
-                    {getRiskBadge(selectedObs.overflowRisk)}
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      {t('fill_level', 'Fill Percentage')}
+                    </span>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5 font-mono">
+                      {Math.round(selectedObs.fillPercentage)}%
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      ~{selectedObs.estimatedVolumeLitres} Liters accumulated
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">
-                    Deterministic 4-level rubric
-                  </span>
-                </div>
 
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                    Collection Activity
-                  </span>
-                  <div className="mt-1">
-                    {selectedObs.collectionPerformed ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-800">
-                        <Truck className="w-3.5 h-3.5" />
-                        Collected ({selectedObs.collectionQuantityLitres}L)
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                        No collection on date
-                      </span>
-                    )}
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      Overflow Risk Category
+                    </span>
+                    <div className="mt-1">
+                      {getRiskBadge(selectedObs.overflowRisk)}
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">
+                      Deterministic 4-level rubric
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">
-                    Operational log event
-                  </span>
+
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      Collection Activity
+                    </span>
+                    <div className="mt-1">
+                      {selectedObs.collectionPerformed ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-300 dark:border-emerald-800">
+                          <Truck className="w-3.5 h-3.5" />
+                          Collected ({selectedObs.collectionQuantityLitres}L)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                          No collection on date
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">
+                      Operational log event
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
