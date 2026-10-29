@@ -17,7 +17,6 @@ import {
   ArrowLeft,
   KeyRound,
   Mail,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 
@@ -30,13 +29,6 @@ export const WorkerAuthPage = () => {
   const [identifier, setIdentifier] = useState(''); // Worker ID or email
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // Activation inputs
-  const [actWorkerId, setActWorkerId] = useState('');
-  const [actToken, setActToken] = useState('');
-  const [actPassword, setActPassword] = useState('');
-  const [actConfirmPassword, setActConfirmPassword] = useState('');
-  const [showActPassword, setShowActPassword] = useState(false);
 
   // Password reset inputs
   const [resetEmail, setResetEmail] = useState('');
@@ -83,50 +75,7 @@ export const WorkerAuthPage = () => {
     }
   };
 
-  /* ============================================================
-   * MODULE 2: Worker Account Activation with Provisioning Token
-   * Activates pending worker profiles using tokens issued by administrators
-   * ============================================================ */
-  const handleActivate = async (e) => {
-    if (e) e.preventDefault();
-    clearMessages();
-
-    if (!actWorkerId.trim() || !actToken.trim()) {
-      setError('Worker ID and invitation activation token are required.');
-      return;
-    }
-    if (actPassword.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-    if (actPassword !== actConfirmPassword) {
-      setError('Passwords do not match. Please re-enter.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.activateWorker({
-        workerId: actWorkerId.trim(),
-        activationToken: actToken.trim(),
-        newPassword: actPassword,
-        confirmPassword: actConfirmPassword,
-      });
-
-      setSuccessMsg(res.message || 'Worker account successfully activated! Please sign in.');
-      setIdentifier(actWorkerId.trim());
-      setMode('login');
-      setActToken('');
-      setActPassword('');
-      setActConfirmPassword('');
-    } catch (err) {
-      setError(err.message || 'Worker activation failed. Token may be invalid, expired, or already used.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. Worker Forgot Password Request
+  // 2. Worker Forgot Password Request
   const handleForgotRequest = async (e) => {
     e.preventDefault();
     clearMessages();
@@ -225,37 +174,14 @@ export const WorkerAuthPage = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
         <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl p-6 sm:p-8 transition-colors">
-          {/* Top navigation tabs between Sign In and Activate Account */}
-          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 mb-6 border border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                clearMessages();
-                setMode('login');
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Worker Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                clearMessages();
-                setMode('activate');
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                mode === 'activate'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Activate Account
-            </button>
-          </div>
+          {mode === 'login' && (
+            <div className="mb-6">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Worker Sign In</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Sign in with your assigned Worker ID or municipal email.
+              </p>
+            </div>
+          )}
 
           {/* Feedback messages */}
           {error && (
@@ -345,142 +271,7 @@ export const WorkerAuthPage = () => {
                 </button>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  New worker with an invitation?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearMessages();
-                      setMode('activate');
-                    }}
-                    className="font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-                  >
-                    Activate Account
-                  </button>
-                </p>
-              </div>
             </form>
-          )}
-
-          {/* 2. WORKER ACCOUNT ACTIVATION */}
-          {mode === 'activate' && (
-            <div>
-              <div className="mb-4 text-left">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-500" />
-                  Activate Invited Worker Account
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Workers are provisioned by your municipal supervisor. Activate with your invitation token.
-                </p>
-
-
-              </div>
-
-              <form onSubmit={handleActivate} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Worker ID or Registered Work Email</label>
-                  <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <UserCheck className="h-4 w-4" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={actWorkerId}
-                      onChange={(e) => setActWorkerId(e.target.value)}
-                      placeholder="e.g. WRK-NSK-103 or worker.pending@econexus.gov.in"
-                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Activation Token (Issued by Administrator)
-                  </label>
-                  <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <KeyRound className="h-4 w-4" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={actToken}
-                      onChange={(e) => setActToken(e.target.value.trim())}
-                      placeholder="e.g. ACT-NSK-2026"
-                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Create New Password (min 8 chars)</label>
-                  <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="h-4 w-4" />
-                    </div>
-                    <input
-                      type={showActPassword ? 'text' : 'password'}
-                      required
-                      value={actPassword}
-                      onChange={(e) => setActPassword(e.target.value)}
-                      placeholder="At least 8 characters"
-                      className="block w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowActPassword(!showActPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                    >
-                      {showActPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Confirm Password</label>
-                  <div className="mt-1 relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="h-4 w-4" />
-                    </div>
-                    <input
-                      type={showActPassword ? 'text' : 'password'}
-                      required
-                      value={actConfirmPassword}
-                      onChange={(e) => setActConfirmPassword(e.target.value)}
-                      placeholder="Confirm password"
-                      className="block w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
-                  >
-                    {loading ? 'Activating...' : 'Activate & Save Password'}
-                    <CheckCircle2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </form>
-
-              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearMessages();
-                    setMode('login');
-                  }}
-                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  Already activated? Return to Sign In
-                </button>
-              </div>
-            </div>
           )}
 
           {/* ============================================================

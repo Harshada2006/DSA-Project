@@ -3,12 +3,45 @@ import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, use
 import L from 'leaflet';
 import { ProvenanceBadge } from '../common/ProvenanceBadge.jsx';
 
-// Helper component to pan/zoom smoothly
-function MapViewUpdater({ center, zoom }) {
+// Helper component to pan/zoom smoothly and auto-fit route bounds
+function MapViewUpdater({ center, zoom, routePath, waypointLocations, sourceLocation, targetLocation }) {
   const map = useMap();
   useEffect(() => {
+    map.invalidateSize();
+    const allCoords = [];
+    if (routePath && Array.isArray(routePath)) {
+      routePath.forEach((p) => {
+        if (Array.isArray(p) && p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1])) {
+          allCoords.push([p[0], p[1]]);
+        }
+      });
+    }
+    if (sourceLocation && !isNaN(sourceLocation.lat ?? sourceLocation.latitude)) {
+      allCoords.push([sourceLocation.lat ?? sourceLocation.latitude, sourceLocation.lng ?? sourceLocation.longitude]);
+    }
+    if (targetLocation && !isNaN(targetLocation.lat ?? targetLocation.latitude)) {
+      allCoords.push([targetLocation.lat ?? targetLocation.latitude, targetLocation.lng ?? targetLocation.longitude]);
+    }
+    if (Array.isArray(waypointLocations)) {
+      waypointLocations.forEach((wp) => {
+        if (!isNaN(wp.lat ?? wp.latitude)) {
+          allCoords.push([wp.lat ?? wp.latitude, wp.lng ?? wp.longitude]);
+        }
+      });
+    }
+    if (allCoords.length > 1) {
+      try {
+        const bounds = L.latLngBounds(allCoords);
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [45, 45], maxZoom: 16 });
+          return;
+        }
+      } catch {
+        // Fallback
+      }
+    }
     map.setView(center, zoom);
-  }, [center, zoom, map]);
+  }, [center, zoom, routePath, waypointLocations, sourceLocation, targetLocation, map]);
   return null;
 }
 
@@ -78,6 +111,62 @@ function createStopIcon(order, isDepot) {
   });
 }
 
+function createSourceIcon(label = 'A') {
+  return L.divIcon({
+    className: 'custom-source-pin',
+    html: `
+      <div style="background: linear-gradient(135deg, #10b981, #047857); color: white; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4);">
+        <span style="transform: rotate(45deg); font-weight: 800; font-size: 11px;">${label}</span>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -28],
+  });
+}
+
+function createDestinationIcon(label = 'B') {
+  return L.divIcon({
+    className: 'custom-dest-pin',
+    html: `
+      <div style="background: linear-gradient(135deg, #f59e0b, #dc2626); color: white; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4);">
+        <span style="transform: rotate(45deg); font-weight: 800; font-size: 11px;">${label}</span>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -28],
+  });
+}
+
+function createIntermediateNodeIcon(idx) {
+  return L.divIcon({
+    className: 'custom-node-dot',
+    html: `
+      <div style="background-color: #0f172a; color: #38bdf8; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; border: 2px solid #38bdf8; box-shadow: 0 2px 4px rgba(0,0,0,0.35);">
+        ${idx}
+      </div>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -10],
+  });
+}
+
+function createWaypointPinIcon(order) {
+  return L.divIcon({
+    className: 'custom-waypoint-pin',
+    html: `
+      <div style="background: linear-gradient(135deg, #0284c7, #0369a1); color: white; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4);">
+        <span style="transform: rotate(45deg); font-weight: 800; font-size: 11px;">${order}</span>
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -26],
+  });
+}
+
 export const LeafletMap = ({
   center = [19.9975, 73.7898], // Center on Nashik
   zoom = 13,
@@ -87,6 +176,13 @@ export const LeafletMap = ({
   wards = [],
   routePath = [],
   routeStops = [],
+  sourceLocation = null,
+  targetLocation = null,
+  waypointLocations = [],
+  intermediateNodes = [],
+  routeLineColor = '#059669',
+  isApproximate = false,
+  routingProvider = null,
   selectedBinId,
   onSelectBin,
   showBins = true,
@@ -98,13 +194,36 @@ export const LeafletMap = ({
 }) => {
   return (
     <div className={`relative overflow-hidden ${className}`}>
+      {/* Route mode badge overlay */}
+      {showRoutes && routePath && routePath.length > 1 && (
+        <div className="absolute top-3 right-3 z-[1000] pointer-events-none">
+          {isApproximate ? (
+            <div className="bg-amber-600/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-lg border border-amber-700/40 flex items-center gap-2 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-200 animate-ping" />
+              <span>⚠ Approximate Path (Straight-Line Fallback)</span>
+            </div>
+          ) : (
+            <div className="bg-emerald-700/95 text-white backdrop-blur-md px-3 py-1.5 rounded-xl shadow-lg border border-emerald-800/40 flex items-center gap-2 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+              <span>✓ Drivable Road Route {routingProvider ? `(${routingProvider})` : '(OSRM)'}</span>
+            </div>
+          )}
+        </div>
+      )}
       <MapContainer
         center={center}
         zoom={zoom}
         scrollWheelZoom={false}
         className="h-full w-full z-0"
       >
-        <MapViewUpdater center={center} zoom={zoom} />
+        <MapViewUpdater
+          center={center}
+          zoom={zoom}
+          routePath={routePath}
+          waypointLocations={waypointLocations}
+          sourceLocation={sourceLocation}
+          targetLocation={targetLocation}
+        />
 
         {/* OpenStreetMap Tiles with Attribution */}
         <TileLayer
@@ -273,15 +392,94 @@ export const LeafletMap = ({
             </Marker>
           ))}
 
+        {/* Intermediate Road Nodes on Dijkstra Shortest Path */}
+        {showRoutes &&
+          intermediateNodes &&
+          intermediateNodes.map((node, idx) => (
+            <Marker
+              key={`inter-${node.id || idx}`}
+              position={[node.lat ?? node.latitude, node.lng ?? node.longitude]}
+              icon={createIntermediateNodeIcon(idx + 1)}
+            >
+              <Popup>
+                <div className="text-xs p-1">
+                  <div className="font-bold text-slate-800">Intermediate Node #{idx + 1}</div>
+                  <div className="font-mono text-sky-700 text-[11px]">{node.id}</div>
+                  {node.name && <div className="text-slate-600 text-[11px]">{node.name}</div>}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+        {/* Source Location Marker */}
+        {showRoutes && sourceLocation && (
+          <Marker
+            position={[sourceLocation.lat ?? sourceLocation.latitude, sourceLocation.lng ?? sourceLocation.longitude]}
+            icon={createSourceIcon(sourceLocation.label || 'A')}
+          >
+            <Popup>
+              <div className="text-xs p-1">
+                <div className="font-bold text-emerald-800 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                  Start / Source (A)
+                </div>
+                <div className="text-slate-800 font-semibold">{sourceLocation.name || sourceLocation.id}</div>
+                {sourceLocation.details && <div className="text-slate-500 text-[10px] mt-0.5">{sourceLocation.details}</div>}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Intermediate Waypoint Markers */}
+        {showRoutes &&
+          waypointLocations &&
+          waypointLocations.map((wp, idx) => (
+            <Marker
+              key={`wp-${wp.id || idx}`}
+              position={[wp.lat ?? wp.latitude, wp.lng ?? wp.longitude]}
+              icon={createWaypointPinIcon(wp.order || idx + 1)}
+            >
+              <Popup>
+                <div className="text-xs p-1">
+                  <div className="font-bold text-sky-800 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-500 inline-block"></span>
+                    Intermediate Stop #{wp.order || idx + 1}
+                  </div>
+                  <div className="text-slate-800 font-semibold">{wp.name || wp.id}</div>
+                  {wp.details && <div className="text-slate-500 text-[10px] mt-0.5">{wp.details}</div>}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+        {/* Target / Destination Marker */}
+        {showRoutes && targetLocation && (
+          <Marker
+            position={[targetLocation.lat ?? targetLocation.latitude, targetLocation.lng ?? targetLocation.longitude]}
+            icon={createDestinationIcon(targetLocation.label || 'B')}
+          >
+            <Popup>
+              <div className="text-xs p-1">
+                <div className="font-bold text-amber-800 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                  Destination / Target (B)
+                </div>
+                <div className="text-slate-800 font-semibold">{targetLocation.name || targetLocation.id}</div>
+                {targetLocation.details && <div className="text-slate-500 text-[10px] mt-0.5">{targetLocation.details}</div>}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {/* Route Polyline (Dijkstra Path) */}
         {showRoutes && routePath.length > 1 && (
           <Polyline
             positions={routePath}
             pathOptions={{
-              color: '#059669',
-              weight: 4,
-              opacity: 0.85,
-              dashArray: '8, 6',
+              color: isApproximate ? '#d97706' : (routeLineColor || '#059669'),
+              weight: isApproximate ? 4 : 5,
+              opacity: 0.9,
+              dashArray: isApproximate ? '8, 8' : undefined,
             }}
           />
         )}

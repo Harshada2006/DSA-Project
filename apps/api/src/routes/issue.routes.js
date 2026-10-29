@@ -14,9 +14,13 @@ router.post('/', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async 
   }
 });
 
-// List issues
+// List issues or active roadblocks if accessed via /roadblocks
 router.get('/', authenticate, authorize('WORKER', 'ORGANIZATION_ADMIN'), async (req, res) => {
   try {
+    if (req.baseUrl.endsWith('/roadblocks')) {
+      const roadblocks = await issueService.getActiveRoadblocks();
+      return res.json({ success: true, data: roadblocks });
+    }
     const issues = await issueService.getIssues(req.user, req.query);
     res.json({ success: true, count: issues.length, data: issues });
   } catch (err) {

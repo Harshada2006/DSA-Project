@@ -144,6 +144,11 @@ export const api = {
   getBins: (params = {}) => {
     const q = new URLSearchParams();
     if (params.wardId) q.set('wardId', params.wardId);
+    if (params.zone) q.set('zone', params.zone);
+    if (params.latitude !== undefined) q.set('latitude', params.latitude);
+    if (params.longitude !== undefined) q.set('longitude', params.longitude);
+    if (params.radiusKm !== undefined) q.set('radiusKm', params.radiusKm);
+    if (params.date) q.set('date', params.date);
     if (params.status) q.set('status', params.status);
     if (params.urgency) q.set('urgency', params.urgency);
     if (params.wasteType) q.set('wasteType', params.wasteType);
@@ -297,6 +302,7 @@ export const api = {
     const q = new URLSearchParams();
     if (params.facilityType) q.set('facilityType', params.facilityType);
     if (params.verificationStatus) q.set('verificationStatus', params.verificationStatus);
+    if (params.wasteType) q.set('wasteType', params.wasteType);
     return fetchJson(`/facilities?${q.toString()}`);
   },
 
@@ -325,17 +331,26 @@ export const api = {
     }),
 
   // C++ DSA
+  getRoadNodes: () => fetchJson('/dsa/nodes'),
+
   getPrioritizedTasks: (payload = {}) =>
     fetchJson('/dsa/prioritize', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
-  getShortestPath: (sourceId, targetId, useTime = false) =>
-    fetchJson('/dsa/shortest-path', {
+  getShortestPath: (sourceId, targetId, useTime = false, avoidBlocked = true, intermediateStops = []) => {
+    let payload = {};
+    if (typeof sourceId === 'object' && sourceId !== null) {
+      payload = sourceId;
+    } else {
+      payload = { sourceId, targetId, useTime, avoidBlocked, intermediateStops };
+    }
+    return fetchJson('/dsa/shortest-path', {
       method: 'POST',
-      body: JSON.stringify({ sourceId, targetId, useTime }),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 
   optimizeRoute: (payload) =>
     fetchJson('/dsa/optimize-route', {

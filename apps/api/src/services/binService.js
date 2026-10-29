@@ -1,14 +1,27 @@
 import { prisma } from '../database/client.js';
 import { predictionService } from './predictionService.js';
 
+function calculateHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 100) / 100;
+}
+
 export class BinService {
   /* ============================================================
    * MODULE 1: Bin Inventory & Filtering Retrieval
-   * Queries bins by ward, status, waste stream, and search term
+   * Queries bins by ward, status, waste stream, search term, and geographic bounds
    * ============================================================ */
   async getBins(filters = {}) {
     const where = {};
     if (filters.wardId) where.wardId = filters.wardId;
+    if (filters.zone) where.ward = { zone: filters.zone };
     if (filters.status) where.status = filters.status;
     if (filters.wasteType) where.wasteType = filters.wasteType;
     if (filters.areaCategory) where.areaCategory = filters.areaCategory;
@@ -21,7 +34,64 @@ export class BinService {
       ];
     }
 
-    return await prisma.bin.findMany({
+    // Geographic Proximity Validation
+    const hasGeoFilter = filters.latitude !== undefined || filters.longitude !== undefined;
+    let targetLat = null;
+    let targetLng = null;
+    let radiusKm = 5.0;
+
+    if (hasGeoFilter) {
+      if (filters.latitude === undefined || filters.longitude === undefined || filters.latitude === '' || filters.longitude === '') {
+        throw new Error('Both latitude and longitude are required when performing a geographic location search.');
+      }
+      targetLat = parseFloat(filters.latitude);
+      targetLng = parseFloat(filters.longitude);
+      if (isNaN(targetLat) || isNaN(targetLng) || targetLat < -90 || targetLat > 90 || targetLng < -180 || targetLng > 180) {
+        throw new Error('Invalid geographic coordinates: latitude must be between -90 and 90, longitude between -180 and 180.');
+      }
+      radiusKm = parseFloat(filters.radiusKm || filters.maxDistanceKm) || 5.0;
+    }
+
+    if (filters.date) {
+      const targetDate = String(filters.date).trim();
+      const endOfTargetDate = new Date(`${targetDate}T23:59:59.999Z`);
+      const bins = await prisma.bin.findMany({
+        where,
+        include: {
+          ward: true,
+          observations: {
+            where: { observedAt: { lte: endOfTargetDate } },
+            orderBy: { observedAt: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: { priorityScore: 'desc' },
+      });
+
+      const mapped = bins.map((bin) => {
+        const obs = bin.observations && bin.observations.length > 0 ? bin.observations[0] : null;
+        const obsDate = obs ? obs.observedAt.toISOString().split('T')[0] : null;
+        const hasData = !!obs && obsDate === targetDate;
+        const distanceKm = hasGeoFilter ? calculateHaversineDistanceKm(targetLat, targetLng, bin.latitude, bin.longitude) : null;
+        return {
+          ...bin,
+          isHistorical: true,
+          historicalDate: targetDate,
+          hasHistoricalData: hasData,
+          currentFillPercentage: bin.currentFillPercentage,
+          displayedFillPercentage: hasData ? obs.fillPercentage : (obs ? obs.fillPercentage : null),
+          historicalObservation: obs,
+          distanceKm,
+        };
+      });
+
+      if (hasGeoFilter) {
+        return mapped.filter((b) => b.distanceKm <= radiusKm);
+      }
+      return mapped;
+    }
+
+    const bins = await prisma.bin.findMany({
       where,
       include: {
         ward: true,
@@ -32,6 +102,21 @@ export class BinService {
       },
       orderBy: { priorityScore: 'desc' },
     });
+
+    const mapped = bins.map((bin) => {
+      const distanceKm = hasGeoFilter ? calculateHaversineDistanceKm(targetLat, targetLng, bin.latitude, bin.longitude) : null;
+      return {
+        ...bin,
+        isHistorical: false,
+        displayedFillPercentage: bin.currentFillPercentage,
+        distanceKm,
+      };
+    });
+
+    if (hasGeoFilter) {
+      return mapped.filter((b) => b.distanceKm <= radiusKm);
+    }
+    return mapped;
   }
 
   /* ============================================================
@@ -86,11 +171,12 @@ export class BinService {
       if (options.endDate) whereObs.observedAt.lte = new Date(options.endDate + 'T23:59:59Z');
     }
 
-    const observations = await prisma.binObservation.findMany({
+    const recentObservations = await prisma.binObservation.findMany({
       where: whereObs,
-      orderBy: { observedAt: 'asc' },
-      take: options.limit ? parseInt(options.limit, 10) : 180,
+      orderBy: { observedAt: 'desc' },
+      take: options.limit ? parseInt(options.limit, 10) : 365,
     });
+    const observations = [...recentObservations].reverse();
 
     const whereCol = { binId: id };
     if (options.startDate || options.endDate) {
@@ -137,12 +223,44 @@ export class BinService {
 
     // Selected date observation
     let selectedObservation = null;
-    if (options.date) {
-      const targetDate = String(options.date).trim();
-      selectedObservation = timeline.find((t) => t.date === targetDate);
-    }
-    if (!selectedObservation && timeline.length > 0) {
-      selectedObservation = timeline[timeline.length - 1]; // default to latest
+    let hasHistoricalDataForDate = true;
+    const requestedDate = options.date ? String(options.date).trim() : null;
+
+    if (requestedDate) {
+      selectedObservation = timeline.find((t) => t.date === requestedDate) || null;
+      if (!selectedObservation) {
+        // Direct query fallback for dates outside the timeline slice
+        const exactObs = await prisma.binObservation.findFirst({
+          where: {
+            binId: id,
+            observedAt: {
+              gte: new Date(requestedDate + 'T00:00:00.000Z'),
+              lte: new Date(requestedDate + 'T23:59:59.999Z'),
+            },
+          },
+          orderBy: { observedAt: 'desc' },
+        });
+        if (exactObs) {
+          const d = exactObs.observedAt.toISOString().split('T')[0];
+          selectedObservation = {
+            id: exactObs.id,
+            date: d,
+            observedAt: exactObs.observedAt,
+            fillPercentage: exactObs.fillPercentage,
+            estimatedVolumeLitres: Math.round(((exactObs.fillPercentage / 100.0) * bin.capacityLiters) * 10) / 10,
+            overflowRisk: exactObs.fillPercentage >= 85 ? 'critical' : exactObs.fillPercentage >= 70 ? 'high' : exactObs.fillPercentage >= 50 ? 'monitor' : 'normal',
+            collectionPerformed: 0,
+            collectionQuantityLitres: 0,
+            provenance: exactObs.provenance,
+            notes: exactObs.notes,
+          };
+          hasHistoricalDataForDate = true;
+        } else {
+          hasHistoricalDataForDate = false;
+        }
+      }
+    } else {
+      selectedObservation = timeline.length > 0 ? timeline[timeline.length - 1] : null;
     }
 
     const latestObservation = timeline.length > 0 ? timeline[timeline.length - 1] : null;
@@ -157,7 +275,11 @@ export class BinService {
     return {
       bin,
       selectedObservation,
+      hasHistoricalDataForDate,
+      requestedDate,
+      selectedDate: requestedDate,
       latestObservation,
+      currentFillPercentage: bin.currentFillPercentage,
       timeline,
       totalObservations: timeline.length,
       totalCollections: collections.length,

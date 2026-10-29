@@ -67,12 +67,14 @@ export const FacilitiesPage = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const address = form.facilityAddress || form.businessAddress || form.address || `${form.name}, Nashik`;
       await api.createFacility({
         ...form,
+        address,
         latitude: 19.99,
         longitude: 73.78,
       });
-      showToast('success', `Facility "${form.name}" registered successfully!`);
+      showToast('success', `Facility "${form.name}" registered successfully! Status set to pending confirmation.`);
       setIsAddOpen(false);
       setForm({
         name: '',
@@ -95,18 +97,21 @@ export const FacilitiesPage = () => {
     }
   };
 
-  const filteredFacilities = facilities.filter((fac) => {
-    if (selectedType && fac.facilityType !== selectedType) return false;
-    if (selectedStatus && fac.verificationStatus !== selectedStatus) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (fac.name || '').toLowerCase().includes(q) ||
-      (fac.area || '').toLowerCase().includes(q) ||
-      (fac.facilityAddress || fac.address || '').toLowerCase().includes(q) ||
-      (fac.businessAddress || '').toLowerCase().includes(q)
-    );
-  });
+  const filteredFacilities = facilities
+    .filter((fac) => {
+      if (selectedType && fac.facilityType !== selectedType) return false;
+      if (selectedStatus && (fac.verificationStatus || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        (fac.name || '').toLowerCase().includes(q) ||
+        (fac.area || '').toLowerCase().includes(q) ||
+        (fac.facilityAddress || fac.address || '').toLowerCase().includes(q) ||
+        (fac.businessAddress || '').toLowerCase().includes(q)
+      );
+    })
+    // If filtering for verified facilities specifically, display no more than six verified facilities
+    .slice(0, selectedStatus === 'verified' ? 6 : 50);
 
   const getVerificationBadge = (status) => {
     const s = (status || '').toLowerCase();

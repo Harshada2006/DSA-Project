@@ -5,6 +5,7 @@ import { Button } from '../components/common/Button.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { SearchInput } from '../components/common/SearchInput.jsx';
 import { BinHistoryModal } from '../components/bins/BinHistoryModal.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import {
   Plus,
   RefreshCw,
@@ -15,9 +16,11 @@ import {
   Sparkles,
   Info,
   TrendingUp,
+  Calendar,
 } from 'lucide-react';
 
 export const BinsPage = () => {
+  const { t } = useLanguage();
   const [bins, setBins] = useState([]);
   const [wards, setWards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +28,7 @@ export const BinsPage = () => {
   const [selectedWard, setSelectedWard] = useState('');
   const [selectedUrgency, setSelectedUrgency] = useState('');
   const [selectedWasteType, setSelectedWasteType] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
 
   // Status feedback toast
   const [feedback, setFeedback] = useState(null);
@@ -61,6 +65,7 @@ export const BinsPage = () => {
           wardId: selectedWard || undefined,
           urgency: selectedUrgency || undefined,
           wasteType: selectedWasteType || undefined,
+          date: selectedDate || undefined,
         }),
         api.getWards(),
       ]);
@@ -78,7 +83,7 @@ export const BinsPage = () => {
 
   useEffect(() => {
     loadData();
-  }, [selectedWard, selectedUrgency, selectedWasteType]);
+  }, [selectedWard, selectedUrgency, selectedWasteType, selectedDate]);
 
   const handleCreateBin = async (e) => {
     e.preventDefault();
@@ -137,12 +142,14 @@ export const BinsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Municipal Bin Assets</h1>
-            <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              {t('nav_bins', 'Municipal Bin Assets')}
+            </h1>
+            <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200 dark:border-emerald-800">
               {bins.length} Registered
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Standardized waste bins inventory mapped to Nashik Municipal Corporation administrative wards
           </p>
         </div>
@@ -157,7 +164,7 @@ export const BinsPage = () => {
         </Button>
       </div>
 
-      {/* Filters Bar with SearchInput */}
+      {/* Filters Bar with SearchInput & Date Picker */}
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex-1 min-w-[240px]">
@@ -170,6 +177,26 @@ export const BinsPage = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-slate-600 dark:text-slate-400 font-semibold">{t('historical_filter', 'Date')}:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-2 py-0.5 border border-slate-300 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+              />
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate('')}
+                  className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer ml-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             <select
               value={selectedWard}
               onChange={(e) => setSelectedWard(e.target.value)}
@@ -219,7 +246,9 @@ export const BinsPage = () => {
                 <th className="p-3.5">Asset Code & Name</th>
                 <th className="p-3.5">Nashik Ward</th>
                 <th className="p-3.5">Type & Capacity</th>
-                <th className="p-3.5">Predicted Fill Level (Est.)</th>
+                <th className="p-3.5">
+                  {selectedDate ? `${t('fill_level', 'Fill Level')} (${selectedDate})` : t('fill_level', 'Fill Level (Live)')}
+                </th>
                 <th className="p-3.5">Priority Score</th>
                 <th className="p-3.5 text-right">Details</th>
               </tr>
@@ -240,7 +269,10 @@ export const BinsPage = () => {
                 </tr>
               ) : (
                 filteredBins.map((bin) => {
-                  const fill = bin.currentFillPercentage || 0;
+                  const fill = selectedDate
+                    ? (bin.hasHistoricalData ? bin.displayedFillPercentage : bin.currentFillPercentage)
+                    : (bin.currentFillPercentage || 0);
+
                   let fillBarColor = 'bg-emerald-500';
                   if (fill >= 80) fillBarColor = 'bg-rose-500';
                   else if (fill >= 60) fillBarColor = 'bg-amber-500';
@@ -260,13 +292,26 @@ export const BinsPage = () => {
                         <div className="text-slate-500 dark:text-slate-400 text-[11px]">{bin.capacityLiters} Liters</div>
                       </td>
                       <td className="p-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                            <div className={`h-full ${fillBarColor}`} style={{ width: `${Math.min(100, fill)}%` }} />
+                        {selectedDate && !bin.hasHistoricalData ? (
+                          <div className="space-y-0.5">
+                            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800 inline-block">
+                              No reading on date
+                            </span>
+                            <div className="text-[10px] text-slate-400">Live: {Math.round(bin.currentFillPercentage)}%</div>
                           </div>
-                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">{Math.round(fill)}%</span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">est.</span>
-                        </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                              <div className={`h-full ${fillBarColor}`} style={{ width: `${Math.min(100, fill)}%` }} />
+                            </div>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">{Math.round(fill)}%</span>
+                            {selectedDate && bin.hasHistoricalData && (
+                              <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1 rounded border border-emerald-300 dark:border-emerald-800">
+                                History
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3.5">
                         <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded text-xs">

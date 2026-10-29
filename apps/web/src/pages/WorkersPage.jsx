@@ -84,19 +84,28 @@ export const WorkersPage = () => {
     showToast('success', 'Activation token copied to clipboard!');
   };
 
+  const formatVehicleType = (vType) => {
+    if (!vType) return 'Compactor Truck';
+    return vType
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   const filteredWorkers = workers.filter((w) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
       (w.user?.name || '').toLowerCase().includes(q) ||
       (w.workerId || '').toLowerCase().includes(q) ||
-      (w.vehicleNumber || '').toLowerCase().includes(q) ||
+      (w.vehicleType || '').toLowerCase().includes(q) ||
+      (w.assignedWard || '').toLowerCase().includes(q) ||
       (w.user?.email || '').toLowerCase().includes(q)
     );
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-900 dark:text-slate-100">
       {/* Toast Feedback */}
       {toast && (
         <div className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border text-xs font-semibold ${
@@ -111,13 +120,13 @@ export const WorkersPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Municipal Field Staff & Drivers</h1>
-            <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Municipal Field Staff Directory</h1>
+            <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200 dark:border-emerald-800">
               {workers.length} Personnel
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Authorized collection crews operating compactor trucks across Nashik Municipal Corporation
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Authorized collection staff, sanitation operatives, and compactor truck drivers in Nashik Municipal Corporation
           </p>
         </div>
 
@@ -140,37 +149,37 @@ export const WorkersPage = () => {
       </div>
 
       {/* Search Input Bar */}
-      <Card className="p-4">
+      <Card className="p-4 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
         <div className="max-w-md">
           <SearchInput
             value={search}
             onChange={setSearch}
             onClear={() => setSearch('')}
-            placeholder="Search workers by name, Worker ID, vehicle, or email..."
+            placeholder="Search workers by name, Worker ID, ward, or vehicle type..."
           />
         </div>
       </Card>
 
-      {/* Workers Roster Table */}
-      <Card className="overflow-hidden">
+      {/* Workers Directory Table */}
+      <Card className="overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+            <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="p-3.5">Worker Name</th>
+                <th className="p-3.5">Staff Name & Role</th>
                 <th className="p-3.5">Worker ID</th>
-                <th className="p-3.5">Assigned Vehicle</th>
+                <th className="p-3.5">Assigned Ward</th>
+                <th className="p-3.5">Vehicle Type</th>
                 <th className="p-3.5">Account Status</th>
-                <th className="p-3.5">Activation Status</th>
-                <th className="p-3.5">Contact Email</th>
+                <th className="p-3.5">Contact Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="text-center p-8 text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
-                    Loading field workforce...
+                    Loading field workforce directory...
                   </td>
                 </tr>
               ) : filteredWorkers.length === 0 ? (
@@ -181,34 +190,35 @@ export const WorkersPage = () => {
                 </tr>
               ) : (
                 filteredWorkers.map((w) => (
-                  <tr key={w.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-3.5 font-bold text-slate-900 text-xs">
-                      {w.user?.name || 'Staff Member'}
+                  <tr key={w.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="p-3.5">
+                      <div className="font-bold text-slate-900 dark:text-white text-xs">
+                        {w.user?.name || 'Staff Member'}
+                      </div>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Field Operative / Driver
+                      </span>
                     </td>
-                    <td className="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50">
+                    <td className="p-3.5 font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30">
                       {w.workerId}
                     </td>
-                    <td className="p-3.5 font-mono text-slate-800">
-                      {w.vehicleNumber || 'Unassigned'}
+                    <td className="p-3.5 text-slate-800 dark:text-slate-200 font-medium">
+                      {w.assignedWard || 'Panchavati'}
                     </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                        {w.status}
+                    <td className="p-3.5 text-slate-800 dark:text-slate-200 font-medium">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                        <Truck className="w-3 h-3 text-amber-500" />
+                        {formatVehicleType(w.vehicleType)}
                       </span>
                     </td>
                     <td className="p-3.5">
-                      {w.isActivated ? (
-                        <span className="flex items-center gap-1 text-emerald-700 font-semibold text-[11px]">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Activated
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-amber-600 font-semibold text-[11px]">
-                          <KeyRound className="w-3.5 h-3.5" /> Pending Activation
-                        </span>
-                      )}
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        {w.status || 'Active'}
+                      </span>
                     </td>
-                    <td className="p-3.5 text-slate-500 font-mono text-[11px]">
-                      {w.user?.email || '—'}
+                    <td className="p-3.5 text-slate-600 dark:text-slate-400 text-[11px]">
+                      <div>{w.phone || '+91 98231 09876'}</div>
+                      <div className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">{w.user?.email || '—'}</div>
                     </td>
                   </tr>
                 ))

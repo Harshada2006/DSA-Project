@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
     const bins = await binService.getBins(req.query);
     res.json({ success: true, count: bins.length, data: bins });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 

@@ -21,7 +21,9 @@ export async function authenticate(req, res, next) {
       where: { id: decoded.id },
       include: {
         organization: true,
-        workerProfile: true,
+        workerProfile: {
+          include: { organization: true },
+        },
       },
     });
 
@@ -45,11 +47,17 @@ export async function authenticate(req, res, next) {
       email: user.email,
       name: user.name,
       role: user.role, // "ORGANIZATION_ADMIN", "WORKER", "CITIZEN"
-      organizationId: user.organizationId,
-      organizationName: user.organization?.name,
-      organizationCode: user.organization?.code,
+      organizationId: user.organizationId || user.workerProfile?.organizationId,
+      organizationName: user.organization?.name || user.workerProfile?.organization?.name || 'Nashik Municipal Corporation',
+      organizationCode: user.organization?.code || user.workerProfile?.orgCode || 'NMC-SWM',
       workerId: user.workerProfile?.workerId,
       assignedWard: user.workerProfile?.assignedWard,
+      workerProfile: user.workerProfile ? {
+        id: user.workerProfile.id,
+        workerId: user.workerProfile.workerId,
+        assignedWard: user.workerProfile.assignedWard,
+        vehicleType: user.workerProfile.vehicleType,
+      } : undefined,
     };
 
     next();
