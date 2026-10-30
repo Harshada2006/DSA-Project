@@ -14,6 +14,28 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting EcoNexus Nashik database seeding...');
 
+  // SAFETY GUARD: Prevent accidental destruction of live operational databases
+  const existingUserCount = await prisma.user.count();
+  const existingBinCount = await prisma.bin.count();
+  const isDestructiveAllowed = process.env.ALLOW_DESTRUCTIVE_SEED === 'true';
+
+  if ((existingUserCount > 0 || existingBinCount > 0) && !isDestructiveAllowed) {
+    console.warn('\n===============================================================');
+    console.warn('⛔ [SAFETY GUARD TRIGGERED] Destructive database seeding BLOCKED!');
+    console.warn('===============================================================');
+    console.warn(`Database contains ${existingUserCount} users and ${existingBinCount} bins.`);
+    console.warn('Running seed.js will DELETE all operational records, worker accounts,');
+    console.warn('field collections, and citizen complaints.');
+    console.warn('');
+    console.warn('To safely import or refresh historical bin timeseries without wiping:');
+    console.warn('  npm run import:bin-history');
+    console.warn('');
+    console.warn('If you genuinely intend to wipe the database in a disposable test environment:');
+    console.warn('  ALLOW_DESTRUCTIVE_SEED=true npm run db:seed');
+    console.warn('===============================================================\n');
+    process.exit(0);
+  }
+
   // 1. Clean existing records in correct foreign key order
   await prisma.operationalIssue.deleteMany();
   await prisma.sampleWorkerRecord.deleteMany();

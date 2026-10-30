@@ -18,6 +18,8 @@ import {
   Calendar,
   Truck,
   AlertCircle,
+  Trash2,
+  Recycle,
 } from 'lucide-react';
 
 export const EWastePage = () => {
@@ -162,27 +164,28 @@ export const EWastePage = () => {
         </div>
       </div>
 
-      {/* Recyclers Info Banner (Section 18 Nashik facilities) */}
+      {/* Recyclers Info Banner (Verified MPCB E-Waste Recycler Bins) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {facilities.slice(0, 3).map((f) => (
-          <div key={f.id} className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5" />
+          <div key={f.id} className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 flex items-start gap-3 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 relative shadow-sm">
+              <Trash2 className="w-5 h-5 text-white" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-[9px] text-white font-bold" title="Verified E-Waste Recycler">
+                ✓
+              </span>
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm text-slate-900">{f.name}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                  f.verificationStatus === 'verified' ? 'bg-emerald-100 text-emerald-800' :
-                  f.verificationStatus === 'pending_confirmation' ? 'bg-amber-100 text-amber-800' :
-                  'bg-slate-200 text-slate-700'
-                }`}>
-                  {f.verificationStatus?.replace('_', ' ')}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800 flex items-center gap-0.5">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                  VERIFIED
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-1">{f.facilityAddress || f.address}</p>
-              <div className="mt-2 text-xs text-slate-500 font-mono">
-                {f.area || 'Nashik'} • {f.pickupAvailable ? 'Pickup Available' : 'Drop-off'}
+              <div className="mt-2 text-xs text-purple-700 font-semibold flex items-center gap-1">
+                <Recycle className="w-3.5 h-3.5" />
+                <span>Authorized E-Waste Collection Bin • {f.pickupAvailable ? 'Pickup Available' : 'Drop-off Receptacle'}</span>
               </div>
             </div>
           </div>

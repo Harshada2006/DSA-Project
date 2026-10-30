@@ -342,11 +342,11 @@ async function runTests() {
 
   // 9. Nashik Section 18 E-Waste Facilities & Handover Workflow (Section 14 & 18)
   await test('Nashik E-Waste Facilities & Handover Workflow', async () => {
-    // Verify Section 18 Nashik facilities exist with correct attributes
+    // Verify Section 18 Nashik e-waste facilities exist with correct attributes
     const facilities = await prisma.facility.findMany({
       where: { wasteType: 'electronic' },
     });
-    assert.ok(facilities.length >= 4);
+    assert.ok(facilities.length >= 3);
 
     const wonderPrint = facilities.find((f) => f.name.includes('Wonder Print'));
     if (wonderPrint) {
@@ -964,6 +964,88 @@ async function runTests() {
     } finally {
       await prisma.handoverRecord.deleteMany({ where: { ewasteRequestId: request.id } }).catch(() => {});
       await prisma.eWasteRequest.delete({ where: { id: request.id } }).catch(() => {});
+    }
+  });
+
+  // 19. Intermediate Stops & Database-Backed Facility Route Selectors
+  await test('Zero Intermediate Stops Route (Source directly to Destination)', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, []);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.stops.length, 2);
+    assert.strictEqual(res.stops[0].type, 'source');
+    assert.strictEqual(res.stops[1].type, 'destination');
+    const waypoints = res.stops.filter((s) => s.type === 'waypoint');
+    assert.strictEqual(waypoints.length, 0);
+    assert.ok(res.total_distance_km > 0);
+  });
+
+  await test('Duplicate Intermediate Stop Rejection', async () => {
+    const res = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, ['N-CAN', 'N-CAN']);
+    assert.strictEqual(res.reachable, false);
+    assert.ok(res.error.includes('Duplicate intermediate stop'));
+  });
+
+  await test('Intermediate Stop Equal to Source or Destination Rejection', async () => {
+    const resSrc = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, ['N-PAN']);
+    assert.strictEqual(resSrc.reachable, false);
+    assert.ok(resSrc.error.includes('identical to the route source'));
+
+    const resTgt = await dsaService.getShortestPath('N-PAN', 'N-CBS', false, true, ['N-CBS']);
+    assert.strictEqual(resTgt.reachable, false);
+    assert.ok(resTgt.error.includes('identical to the route destination'));
+  });
+
+  await test('Municipal Dumping Facility (NWMPL Database ID) as Route Destination', async () => {
+    const nwmpl = await prisma.facility.findFirst({
+      where: { name: { contains: 'NWMPL' } },
+    });
+    assert.ok(nwmpl, 'NWMPL facility record must exist in database');
+    assert.strictEqual(nwmpl.verificationStatus, 'verified');
+    assert.strictEqual(nwmpl.facilityType, 'general_waste_facility');
+
+    const res = await dsaService.getShortestPath('N-CBS', nwmpl.id, false);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.targetNode.id, 'N-PAT');
+    assert.ok(res.targetLocation.name.includes('NWMPL'));
+    assert.ok(res.total_distance_km > 0);
+    assert.strictEqual(res.node_path[res.node_path.length - 1], 'N-PAT');
+  });
+
+  await test('Municipal Dumping Facility (NWMPL Database ID) as Route Source', async () => {
+    const nwmpl = await prisma.facility.findFirst({
+      where: { name: { contains: 'NWMPL' } },
+    });
+    assert.ok(nwmpl, 'NWMPL facility record must exist in database');
+
+    const res = await dsaService.getShortestPath(nwmpl.id, 'N-CBS', false);
+    assert.strictEqual(res.reachable, true);
+    assert.strictEqual(res.sourceNode.id, 'N-PAT');
+    assert.ok(res.sourceLocation.name.includes('NWMPL'));
+    assert.ok(res.total_distance_km > 0);
+    assert.strictEqual(res.node_path[0], 'N-PAT');
+  });
+
+  await test('Facility Verification & Segregation (MSW Plant distinct from E-Waste Recycler)', async () => {
+    const allFacilities = await facilityService.getFacilities();
+    assert.ok(allFacilities.length >= 4);
+
+    // Every returned facility must be verified
+    for (const f of allFacilities) {
+      assert.strictEqual(f.verificationStatus, 'verified');
+    }
+
+    // MSW plant must NOT be marked as e-waste
+    const msw = allFacilities.find((f) => f.name.includes('NWMPL'));
+    assert.ok(msw);
+    assert.strictEqual(msw.facilityType, 'general_waste_facility');
+    assert.strictEqual(msw.wasteType, 'general');
+
+    // E-waste facilities must be MPCB recyclers
+    const ewasteFacs = allFacilities.filter((f) => f.facilityType !== 'general_waste_facility');
+    assert.ok(ewasteFacs.length >= 3);
+    for (const ef of ewasteFacs) {
+      assert.ok(ef.facilityType === 'verified_ewaste_recycler' || ef.facilityType === 'RECYCLER');
+      assert.strictEqual(ef.wasteType, 'electronic');
     }
   });
 

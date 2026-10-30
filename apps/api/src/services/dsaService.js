@@ -346,6 +346,48 @@ export class DsaService {
     const rawWaypoints = Array.isArray(intermediateStops)
       ? intermediateStops.filter((s) => s !== null && s !== undefined && s !== '')
       : [];
+
+    // Validation: Reject duplicate intermediate stop IDs
+    const seenWaypoints = new Set();
+    for (const wp of rawWaypoints) {
+      const wpKey = String(wp).trim().toLowerCase();
+      if (seenWaypoints.has(wpKey)) {
+        return {
+          reachable: false,
+          error: `Duplicate intermediate stop detected (${wp}). Each intermediate waypoint must be unique.`,
+          source_id: sourceId,
+          target_id: targetId,
+          stops: [],
+        };
+      }
+      seenWaypoints.add(wpKey);
+    }
+
+    // Validation: Reject intermediate stops identical to source or destination
+    const srcKey = String(sourceId).trim().toLowerCase();
+    const tgtKey = String(targetId).trim().toLowerCase();
+    for (const wp of rawWaypoints) {
+      const wpKey = String(wp).trim().toLowerCase();
+      if (wpKey === srcKey) {
+        return {
+          reachable: false,
+          error: `Intermediate stop cannot be identical to the route source location (${sourceId}).`,
+          source_id: sourceId,
+          target_id: targetId,
+          stops: [],
+        };
+      }
+      if (wpKey === tgtKey) {
+        return {
+          reachable: false,
+          error: `Intermediate stop cannot be identical to the route destination location (${targetId}).`,
+          source_id: sourceId,
+          target_id: targetId,
+          stops: [],
+        };
+      }
+    }
+
     const fullSequence = [sourceId, ...rawWaypoints, targetId];
 
     const resolvedStops = [];

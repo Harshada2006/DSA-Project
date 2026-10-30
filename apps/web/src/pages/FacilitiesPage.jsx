@@ -15,6 +15,8 @@ import {
   AlertCircle,
   Truck,
   PackageCheck,
+  Trash2,
+  Recycle,
 } from 'lucide-react';
 
 export const FacilitiesPage = () => {
@@ -36,7 +38,7 @@ export const FacilitiesPage = () => {
     area: 'Ambad MIDC',
     dailyCapacityTons: 10,
     licenseNumber: '',
-    verificationStatus: 'pending_confirmation',
+    verificationStatus: 'verified',
     pickupAvailable: true,
     publicDropoffAvailable: true,
   });
@@ -74,7 +76,7 @@ export const FacilitiesPage = () => {
         latitude: 19.99,
         longitude: 73.78,
       });
-      showToast('success', `Facility "${form.name}" registered successfully! Status set to pending confirmation.`);
+      showToast('success', `Facility "${form.name}" registered successfully as verified!`);
       setIsAddOpen(false);
       setForm({
         name: '',
@@ -85,7 +87,7 @@ export const FacilitiesPage = () => {
         area: 'Ambad MIDC',
         dailyCapacityTons: 10,
         licenseNumber: '',
-        verificationStatus: 'pending_confirmation',
+        verificationStatus: 'verified',
         pickupAvailable: true,
         publicDropoffAvailable: true,
       });
@@ -196,16 +198,10 @@ export const FacilitiesPage = () => {
               <option value="TRANSFER_STATION">Transfer Stations</option>
             </select>
 
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-            >
-              <option value="">All Verification Statuses</option>
-              <option value="verified">Verified</option>
-              <option value="pending_confirmation">Pending Confirmation</option>
-              <option value="unverified">Unverified</option>
-            </select>
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Verified MPCB Recyclers & Facilities</span>
+            </div>
           </div>
         </div>
       </Card>
@@ -226,15 +222,33 @@ export const FacilitiesPage = () => {
             <Card key={fac.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
               <div>
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5" />
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                      fac.facilityType === 'verified_ewaste_recycler' || fac.facilityType === 'RECYCLER' || fac.wasteType === 'electronic'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-900 text-emerald-400'
+                    }`}
+                    title={
+                      fac.facilityType === 'verified_ewaste_recycler' || fac.facilityType === 'RECYCLER' || fac.wasteType === 'electronic'
+                        ? 'Authorized E-Waste Collection Bin & Recycler'
+                        : 'Solid Waste Processing Facility'
+                    }
+                  >
+                    {fac.facilityType === 'verified_ewaste_recycler' || fac.facilityType === 'RECYCLER' || fac.wasteType === 'electronic' ? (
+                      <Trash2 className="w-5 h-5 text-white" />
+                    ) : (
+                      <Building2 className="w-5 h-5" />
+                    )}
                   </div>
                   <div>{getVerificationBadge(fac.verificationStatus)}</div>
                 </div>
 
                 <h3 className="font-bold text-base text-slate-900">{fac.name}</h3>
-                <span className="text-xs font-semibold text-purple-700 block mt-0.5">
-                  {fac.facilityType?.replace(/_/g, ' ')} • {fac.area || 'Nashik'}
+                <span className="text-xs font-semibold text-purple-700 flex items-center gap-1 mt-0.5">
+                  {(fac.facilityType === 'verified_ewaste_recycler' || fac.facilityType === 'RECYCLER' || fac.wasteType === 'electronic') && (
+                    <Recycle className="w-3.5 h-3.5 text-purple-600 inline shrink-0" />
+                  )}
+                  <span>{fac.facilityType?.replace(/_/g, ' ')} • {fac.area || 'Nashik'}</span>
                 </span>
 
                 {/* Section 18: Separated Contact/Business Address vs Facility Address */}
@@ -338,9 +352,7 @@ export const FacilitiesPage = () => {
                     onChange={(e) => setForm({ ...form, verificationStatus: e.target.value })}
                     className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white"
                   >
-                    <option value="verified">Verified</option>
-                    <option value="pending_confirmation">Pending Confirmation</option>
-                    <option value="unverified">Unverified / Reference Only</option>
+                    <option value="verified">Verified (MPCB / NMC Authorized)</option>
                   </select>
                 </div>
               </div>

@@ -18,6 +18,8 @@ import {
   Calendar,
   Building2,
   ExternalLink,
+  Trash2,
+  Recycle,
 } from 'lucide-react';
 import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
 import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
@@ -750,33 +752,35 @@ export const CitizenDashboard = () => {
               </form>
             </div>
 
-            {/* Side Card: Section 18 Nashik E-Waste Facilities */}
+            {/* Side Card: Verified Nashik E-Waste Facilities */}
             <div className="space-y-4">
               <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-3">
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-emerald-600" />
-                  Nashik E-Waste Reference Facilities
+                  <Trash2 className="w-5 h-5 text-purple-600" />
+                  Nashik E-Waste Collection Bins & Recyclers
                 </h4>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Collected electronics are routed to documented facilities in Nashik (Satpur & Ambad MIDC).
+                  Authorized MPCB e-waste recyclers and designated drop-off receptacles in Nashik.
                 </p>
                 <div className="space-y-2.5 pt-2">
                   {facilities
-                    .filter((f) => f.facilityType === 'RECYCLER' || f.wasteType === 'ELECTRONIC')
+                    .filter((f) => f.facilityType === 'RECYCLER' || f.facilityType === 'verified_ewaste_recycler' || f.wasteType === 'ELECTRONIC' || f.wasteType === 'electronic')
                     .slice(0, 4)
                     .map((fac) => (
                       <div key={fac.id} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                        <div className="flex justify-between items-start gap-1">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">{fac.name}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            fac.verificationStatus === 'verified' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300' :
-                            fac.verificationStatus === 'pending_confirmation' ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300' :
-                            'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                          }`}>
-                            {fac.verificationStatus.replace('_', ' ')}
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-white text-xs">{fac.name}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 flex items-center gap-1 shrink-0">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            VERIFIED
                           </span>
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">{fac.facilityAddress || fac.address}</p>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 pl-9">{fac.facilityAddress || fac.address}</p>
                       </div>
                     ))}
                 </div>

@@ -37,6 +37,13 @@ export const WorkerAuthPage = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
 
+  // Worker Activation inputs
+  const [actWorkerId, setActWorkerId] = useState('');
+  const [actToken, setActToken] = useState('');
+  const [actPassword, setActPassword] = useState('');
+  const [actConfirmPassword, setActConfirmPassword] = useState('');
+  const [showActPassword, setShowActPassword] = useState(false);
+
   // Status feedback
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +82,46 @@ export const WorkerAuthPage = () => {
     }
   };
 
-  // 2. Worker Forgot Password Request
+  // 2. Worker Account Activation Handler (Single-Use Token)
+  const handleActivate = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!actWorkerId.trim() || !actToken.trim() || !actPassword) {
+      setError('Worker ID or work email, activation token, and new password are required.');
+      return;
+    }
+    if (actPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (actPassword !== actConfirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.activateWorker({
+        workerId: actWorkerId.trim(),
+        activationToken: actToken.trim(),
+        newPassword: actPassword,
+        confirmPassword: actConfirmPassword,
+      });
+      setSuccessMsg(res.message || 'Worker account successfully activated! Please sign in with your credentials.');
+      setIdentifier(actWorkerId.trim());
+      setActToken('');
+      setActPassword('');
+      setActConfirmPassword('');
+      setMode('login');
+    } catch (err) {
+      setError(err.message || 'Worker activation failed. Token may be invalid or expired.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Worker Forgot Password Request
   const handleForgotRequest = async (e) => {
     e.preventDefault();
     clearMessages();
@@ -174,11 +220,51 @@ export const WorkerAuthPage = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
         <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl p-6 sm:p-8 transition-colors">
+          {(mode === 'login' || mode === 'activate') && (
+            <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
+              <button
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setMode('login');
+                }}
+                className={`flex-1 pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                  mode === 'login'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+              >
+                Worker Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setMode('activate');
+                }}
+                className={`flex-1 pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                  mode === 'activate'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+              >
+                Activate Account
+              </button>
+            </div>
+          )}
+
           {mode === 'login' && (
-            <div className="mb-6">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Worker Sign In</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <div className="mb-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Sign in with your assigned Worker ID or municipal email.
+              </p>
+            </div>
+          )}
+
+          {mode === 'activate' && (
+            <div className="mb-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Enter the single-use activation token issued by your municipal supervisor to establish your password.
               </p>
             </div>
           )}
@@ -271,6 +357,130 @@ export const WorkerAuthPage = () => {
                 </button>
               </div>
 
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('activate');
+                  }}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Have an admin activation token? Activate your account
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* 2. WORKER ACTIVATION */}
+          {mode === 'activate' && (
+            <form onSubmit={handleActivate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Worker ID or Work Email
+                </label>
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <UserCheck className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={actWorkerId}
+                    onChange={(e) => setActWorkerId(e.target.value)}
+                    placeholder="e.g. WRK-NSK-101 or worker1@econexus.gov.in"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Single-Use Activation Token
+                </label>
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={actToken}
+                    onChange={(e) => setActToken(e.target.value)}
+                    placeholder="Paste activation token from admin"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Set New Password (min 8 chars)
+                </label>
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type={showActPassword ? 'text' : 'password'}
+                    required
+                    value={actPassword}
+                    onChange={(e) => setActPassword(e.target.value)}
+                    placeholder="Create a strong password"
+                    className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowActPassword(!showActPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    {showActPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Confirm Password
+                </label>
+                <div className="mt-1 relative rounded-xl shadow-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type={showActPassword ? 'text' : 'password'}
+                    required
+                    value={actConfirmPassword}
+                    onChange={(e) => setActConfirmPassword(e.target.value)}
+                    placeholder="Confirm password"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {loading ? 'Activating...' : 'Activate Worker Account'}
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearMessages();
+                    setMode('login');
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Already activated? Return to Sign In
+                </button>
+              </div>
             </form>
           )}
 

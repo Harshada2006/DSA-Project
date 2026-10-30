@@ -6,14 +6,13 @@ export class FacilityService {
     if (filters.facilityType) {
       const ft = filters.facilityType.toLowerCase();
       if (ft === 'recycler' || ft === 'verified_ewaste_recycler') {
-        where.facilityType = { in: ['verified_ewaste_recycler', 'ewaste_refurbisher'] };
+        where.facilityType = { in: ['verified_ewaste_recycler', 'ewaste_refurbisher', 'RECYCLER'] };
       } else {
         where.facilityType = filters.facilityType;
       }
     }
-    if (filters.verificationStatus) {
-      where.verificationStatus = filters.verificationStatus;
-    }
+    // Return only verified facilities across the system
+    where.verificationStatus = 'verified';
     if (filters.wasteType) {
       where.acceptedWasteCategories = { contains: filters.wasteType };
     }

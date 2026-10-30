@@ -171,9 +171,9 @@ export const LiveMapPage = () => {
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
               Critical: <strong>{criticalCount}</strong>
             </span>
-            <span className="flex items-center gap-1.5 text-purple-700">
+            <span className="flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
               <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
-              MPCB Recyclers: <strong>{facilities.filter((f) => f.facilityType === 'RECYCLER').length}</strong>
+              Verified Recycler Bins: <strong>{facilities.filter((f) => f.facilityType === 'RECYCLER' || f.facilityType === 'verified_ewaste_recycler').length}</strong>
             </span>
           </div>
         </div>
