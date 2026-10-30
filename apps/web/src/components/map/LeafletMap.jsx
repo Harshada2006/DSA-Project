@@ -69,17 +69,35 @@ function createBinIcon(fill, isSelected, isStale = false, priorityCategory = 'No
 }
 
 function createFacilityIcon(type = 'general_waste_facility') {
-  const color = type === 'verified_ewaste_recycler' ? '#8b5cf6' : '#059669';
-  const label = type === 'verified_ewaste_recycler' ? 'EW' : 'FAC';
+  const isEWaste = type === 'verified_ewaste_recycler' || type === 'RECYCLER' || type === 'ewaste_refurbisher';
+  const color = isEWaste ? '#7c3aed' : '#047857'; // Purple for e-waste recycler, Deep Emerald for municipal MSW plant
+  const label = isEWaste ? 'E-BIN' : 'MSW';
+  
+  const iconSvg = isEWaste
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 20h20"/>
+        <path d="M5 20V8l5 4V8l5 4V4h4v16"/>
+        <circle cx="16" cy="8" r="1.5" fill="currentColor"/>
+      </svg>`;
+
   return L.divIcon({
     className: 'custom-facility-icon',
     html: `
-      <div style="background-color: ${color}; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.35);">
-        ${label}
+      <div style="background-color: ${color}; width: 34px; height: 34px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; border: 2.5px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35); position: relative; cursor: pointer;" title="${isEWaste ? 'Authorized MPCB E-Waste Recycler Bin' : 'NWMPL Municipal Solid Waste Processing Plant'}">
+        ${iconSvg}
+        <span style="font-size: 7px; font-weight: 800; line-height: 1; letter-spacing: -0.2px; text-transform: uppercase; margin-top: 1px;">${label}</span>
       </div>
     `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -16],
   });
 }
 
@@ -185,11 +203,15 @@ export const LeafletMap = ({
   routingProvider = null,
   selectedBinId,
   onSelectBin,
+  onSelectSource,
+  onSelectTarget,
   showBins = true,
   showFacilities = true,
   showComplaints = true,
   showWards = true,
   showRoutes = true,
+  showTraversedNodes = false,
+  showLegend = true,
   className = 'h-96 w-full rounded-xl',
 }) => {
   return (
@@ -326,33 +348,82 @@ export const LeafletMap = ({
             );
           })}
 
-        {/* Verified Facilities (MPCB Recyclers & General Waste) */}
+        {/* Verified Facilities (MPCB Recyclers & Municipal MSW Plant) */}
         {showFacilities &&
-          facilities.map((fac) => (
-            <Marker
-              key={fac.id}
-              position={[fac.latitude, fac.longitude]}
-              icon={createFacilityIcon(fac.facilityType)}
-            >
-              <Popup>
-                <div className="p-1 min-w-[220px] text-xs">
-                  <div className="font-bold text-sm text-slate-900 mb-1">{fac.name}</div>
-                  <div className="text-[11px] text-slate-600 mb-1">{fac.address}</div>
-                  <div className="text-[10px] font-mono text-purple-700 mb-1">
-                    {fac.authorizationNumber || 'MPCB Regulated'}
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Source: {fac.sourceOrganization}
-                  </div>
-                  <div className="mt-1">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-800">
-                      {fac.verificationStatus.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          facilities
+            .filter((fac) => {
+              // Deduplicate if facility is already the selected Source (A) or Destination (B)
+              if (sourceLocation && (sourceLocation.id === fac.id || (Math.hypot((sourceLocation.lat ?? sourceLocation.latitude) - fac.latitude, (sourceLocation.lng ?? sourceLocation.longitude) - fac.longitude) < 0.0002))) {
+                return false;
+              }
+              if (targetLocation && (targetLocation.id === fac.id || (Math.hypot((targetLocation.lat ?? targetLocation.latitude) - fac.latitude, (targetLocation.lng ?? targetLocation.longitude) - fac.longitude) < 0.0002))) {
+                return false;
+              }
+              return true;
+            })
+            .map((fac) => {
+              const isEWaste = fac.facilityType === 'verified_ewaste_recycler' || fac.facilityType === 'RECYCLER' || fac.wasteType === 'electronic';
+              return (
+                <Marker
+                  key={fac.id}
+                  position={[fac.latitude, fac.longitude]}
+                  icon={createFacilityIcon(fac.facilityType)}
+                >
+                  <Popup>
+                    <div className="p-1 min-w-[230px] text-xs">
+                      <div className="flex items-center gap-2 mb-1.5 pb-1 border-b border-slate-100">
+                        <span className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs shrink-0 ${
+                          isEWaste ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {isEWaste ? '♻️' : '🏭'}
+                        </span>
+                        <div>
+                          <div className="font-bold text-sm text-slate-900">{fac.name}</div>
+                          <span className={`text-[10px] font-semibold uppercase ${isEWaste ? 'text-purple-700' : 'text-emerald-800'}`}>
+                            {isEWaste ? 'MPCB Authorized E-Waste Recycler' : 'Municipal Solid Waste Processing Plant'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-slate-600 mb-1">{fac.facilityAddress || fac.address}</div>
+                      <div className="text-[10px] font-mono text-slate-700 mb-1">
+                        {fac.authorizationNumber || (isEWaste ? 'MPCB Regulated' : 'NMC Authorized')}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mb-1">
+                        Source: {fac.sourceOrganization}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          ✓ {fac.verificationStatus ? fac.verificationStatus.toUpperCase() : 'VERIFIED'}
+                        </span>
+                      </div>
+                      {/* Action buttons to set as route source or destination */}
+                      {(onSelectSource || onSelectTarget) && (
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                          {onSelectSource && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectSource(fac)}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-bold border border-emerald-200 transition-colors cursor-pointer"
+                            >
+                              Set as Source (A)
+                            </button>
+                          )}
+                          {onSelectTarget && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectTarget(fac)}
+                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold border border-amber-200 transition-colors cursor-pointer"
+                            >
+                              Set as Dest (B)
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
 
         {/* Complaints */}
         {showComplaints &&
@@ -392,8 +463,9 @@ export const LeafletMap = ({
             </Marker>
           ))}
 
-        {/* Intermediate Road Nodes on Dijkstra Shortest Path */}
+        {/* Automatically Traversed Road Network Intersections (Only rendered if showTraversedNodes is explicitly enabled; NEVER as numbered user stop pins) */}
         {showRoutes &&
+          showTraversedNodes &&
           intermediateNodes &&
           intermediateNodes.map((node, idx) => (
             <Marker
@@ -403,9 +475,9 @@ export const LeafletMap = ({
             >
               <Popup>
                 <div className="text-xs p-1">
-                  <div className="font-bold text-slate-800">Intermediate Node #{idx + 1}</div>
-                  <div className="font-mono text-sky-700 text-[11px]">{node.id}</div>
-                  {node.name && <div className="text-slate-600 text-[11px]">{node.name}</div>}
+                  <div className="font-bold text-slate-800">Traversed Road Intersection</div>
+                  <div className="font-mono text-sky-700 text-[11px]">{node.id} — {node.name}</div>
+                  <div className="text-slate-500 text-[10px]">Automatically traversed graph node (Not a user stop)</div>
                 </div>
               </Popup>
             </Marker>
@@ -484,6 +556,41 @@ export const LeafletMap = ({
           />
         )}
       </MapContainer>
+
+      {/* Map Legend Overlay */}
+      {showLegend && (
+        <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md text-[10px] space-y-1 max-w-[200px] pointer-events-auto">
+          <div className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[9px] mb-1">
+            Map Legend
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+            <span className="w-3.5 h-3.5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-[8px] shrink-0">A</span>
+            <span>Start / Source (A)</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+            <span className="w-3.5 h-3.5 rounded-full bg-sky-600 text-white font-bold flex items-center justify-center text-[8px] shrink-0">1</span>
+            <span>Selected Stop (1, 2)</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+            <span className="w-3.5 h-3.5 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center text-[8px] shrink-0">B</span>
+            <span>Destination (B)</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+            <span className="w-3.5 h-3.5 rounded bg-emerald-800 text-white font-bold flex items-center justify-center text-[7px] shrink-0">MSW</span>
+            <span>MSW Disposal Plant</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+            <span className="w-3.5 h-3.5 rounded bg-purple-600 text-white font-bold flex items-center justify-center text-[7px] shrink-0">E-BIN</span>
+            <span>E-Waste Recycler Bin</span>
+          </div>
+          {showBins && (
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block border border-white shrink-0"></span>
+              <span>Waste Bins (Fill %)</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

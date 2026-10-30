@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api/client.js';
 import { LeafletMap } from '../components/map/LeafletMap.jsx';
@@ -35,6 +35,8 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCcw,
+  QrCode,
+  Camera,
 } from 'lucide-react';
 import { LanguageSelector } from '../components/common/LanguageSelector.jsx';
 import { ThemeToggle } from '../components/common/ThemeToggle.jsx';
@@ -82,6 +84,16 @@ export const WorkerDashboard = () => {
     message: '',
   });
 
+  // Bin Asset QR / Barcode Scanner State
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerSupported, setScannerSupported] = useState(true);
+  const [scannerStatus, setScannerStatus] = useState('idle');
+  const [scannerMessage, setScannerMessage] = useState('');
+  const [manualAssetCode, setManualAssetCode] = useState('');
+  const videoRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const scanIntervalRef = React.useRef(null);
+
   // Suggested Route (DSA Shortest Path) State
   const [sourceId, setSourceId] = useState('N-CBS');
   const [targetId, setTargetId] = useState('N-CAN');
@@ -90,6 +102,7 @@ export const WorkerDashboard = () => {
   const [shortestPathResult, setShortestPathResult] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState(null);
+  const routeRequestIdRef = useRef(0);
 
   // E-Waste Handover Form State
   const [handoverForm, setHandoverForm] = useState({
@@ -118,6 +131,9 @@ export const WorkerDashboard = () => {
   // Load all worker portal data on mount
   useEffect(() => {
     loadWorkerData();
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const loadWorkerData = async () => {
@@ -191,6 +207,99 @@ export const WorkerDashboard = () => {
     const critical = tasks.filter((t) => (t.taskPriority || t.priority) === 'critical').length;
     return { total, collected, pending, critical };
   }, [tasks]);
+
+  /* ========================================================================== */
+  /* MODULE: Bin Asset QR & Barcode Camera Scanner (with Manual Fallback)      */
+  /* ========================================================================== */
+  const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setScannerStatus('idle');
+  };
+
+  const startCamera = async () => {
+    setScannerStatus('scanning');
+    setScannerMessage('Contacting device camera...');
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setScannerSupported(false);
+        setScannerStatus('error');
+        setScannerMessage('Camera access not supported by your browser. Please use manual code lookup.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+
+      setScannerMessage('Aim camera at receptacle QR or barcode tag...');
+
+      // Real video frame decoding via BarcodeDetector API when supported
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({
+          formats: ['qr_code', 'code_128', 'code_39', 'ean_13'],
+        });
+
+        scanIntervalRef.current = setInterval(async () => {
+          if (!videoRef.current || videoRef.current.readyState < 2) return;
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes && barcodes.length > 0) {
+              const detectedCode = barcodes[0].rawValue.trim();
+              handleAssetCodeFound(detectedCode);
+            }
+          } catch (_e) {
+            // Frame decode error - continue scanning loop
+          }
+        }, 500);
+      } else {
+        setScannerMessage('BarcodeDetector API unavailable in this browser. Camera active; enter code below if not decoded.');
+      }
+    } catch (err) {
+      setScannerStatus('error');
+      setScannerMessage(`Camera access denied or unavailable (${err.message}). Safe manual asset lookup enabled.`);
+    }
+  };
+
+  const handleAssetCodeFound = (code) => {
+    const clean = code.trim().toUpperCase();
+    const matchedTask = tasks.find(
+      (t) =>
+        (t.bin?.code || '').toUpperCase() === clean ||
+        t.binId === clean ||
+        (t.bin?.name || '').toUpperCase().includes(clean)
+    );
+
+    if (matchedTask) {
+      setSelectedTaskId(matchedTask.id);
+      stopCamera();
+      setIsScannerOpen(false);
+      setNotice({
+        type: 'success',
+        text: `✓ Scanned asset ${matchedTask.bin?.code} recognized! Collection task selected.`,
+      });
+    } else {
+      setScannerStatus('error');
+      setScannerMessage(`Asset code "${clean}" detected, but no matching assigned task found in your queue.`);
+    }
+  };
+
+  const handleManualAssetLookup = (e) => {
+    e.preventDefault();
+    if (!manualAssetCode.trim()) return;
+    handleAssetCodeFound(manualAssetCode);
+  };
 
   /* ========================================================================== */
   /* MODULE 1: Record Collection Handler & Device GPS Verification              */
@@ -378,8 +487,25 @@ export const WorkerDashboard = () => {
   /* ========================================================================== */
   /* MODULE 2: Suggested Route — C++17 Dijkstra Shortest Path Handler           */
   /* ========================================================================== */
+  const handleSourceChange = (newSrc) => {
+    setSourceId(newSrc);
+    routeRequestIdRef.current++;
+    setShortestPathResult(null); // Clear stale route
+    setRouteError(null);
+  };
+
+  const handleTargetChange = (newTgt) => {
+    setTargetId(newTgt);
+    routeRequestIdRef.current++;
+    setShortestPathResult(null); // Clear stale route
+    setRouteError(null);
+  };
+
   const handleAddIntermediateStop = () => {
     const defaultNodeId = roadNodes[intermediateStops.length + 2]?.id || roadNodes[0]?.id || 'N-COL';
+    routeRequestIdRef.current++;
+    setShortestPathResult(null); // Clear stale result when inputs change
+    setRouteError(null);
     setIntermediateStops((prev) => [
       ...prev,
       {
@@ -390,11 +516,17 @@ export const WorkerDashboard = () => {
   };
 
   const handleRemoveIntermediateStop = (index) => {
+    routeRequestIdRef.current++;
+    setShortestPathResult(null); // Clear stale route
+    setRouteError(null);
     setIntermediateStops((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleMoveStopUp = (index) => {
     if (index === 0) return;
+    routeRequestIdRef.current++;
+    setShortestPathResult(null);
+    setRouteError(null);
     setIntermediateStops((prev) => {
       const copy = [...prev];
       const temp = copy[index - 1];
@@ -405,8 +537,11 @@ export const WorkerDashboard = () => {
   };
 
   const handleMoveStopDown = (index) => {
+    if (index >= intermediateStops.length - 1) return;
+    routeRequestIdRef.current++;
+    setShortestPathResult(null);
+    setRouteError(null);
     setIntermediateStops((prev) => {
-      if (index >= prev.length - 1) return prev;
       const copy = [...prev];
       const temp = copy[index + 1];
       copy[index + 1] = copy[index];
@@ -416,6 +551,9 @@ export const WorkerDashboard = () => {
   };
 
   const handleUpdateStopId = (index, newId) => {
+    routeRequestIdRef.current++;
+    setShortestPathResult(null); // Clear stale route
+    setRouteError(null);
     setIntermediateStops((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index], id: newId };
@@ -424,9 +562,11 @@ export const WorkerDashboard = () => {
   };
 
   const handleClearRoute = () => {
+    routeRequestIdRef.current++;
     setShortestPathResult(null);
     setRouteError(null);
     setIntermediateStops([]);
+    setRouteLoading(false);
   };
 
   const handleFindShortestPath = async (customSource, customTarget, customStops) => {
@@ -439,12 +579,41 @@ export const WorkerDashboard = () => {
       return;
     }
 
+    // Validation: Reject duplicate intermediate stops
+    const seen = new Set();
+    for (const wp of waypoints) {
+      const k = String(wp).trim().toLowerCase();
+      if (seen.has(k)) {
+        setRouteError('Duplicate intermediate stops detected. Please select distinct waypoints.');
+        return;
+      }
+      seen.add(k);
+    }
+
+    // Validation: Reject intermediate stop equal to source or destination
+    const srcK = String(src).trim().toLowerCase();
+    const tgtK = String(tgt).trim().toLowerCase();
+    if (waypoints.some((w) => String(w).trim().toLowerCase() === srcK)) {
+      setRouteError('An intermediate stop cannot be identical to the source location.');
+      return;
+    }
+    if (waypoints.some((w) => String(w).trim().toLowerCase() === tgtK)) {
+      setRouteError('An intermediate stop cannot be identical to the destination location.');
+      return;
+    }
+
+    const currentReqId = ++routeRequestIdRef.current;
     setRouteLoading(true);
     setRouteError(null);
     setShortestPathResult(null);
 
     try {
       const result = await api.getShortestPath(src, tgt, false, avoidBlocked, waypoints);
+
+      // Prevent stale async response from overwriting newer request or cleared state
+      if (currentReqId !== routeRequestIdRef.current) {
+        return;
+      }
 
       if (!result || result.reachable === false) {
         setRouteError(
@@ -457,16 +626,21 @@ export const WorkerDashboard = () => {
       setShortestPathResult(result);
       setNotice({
         type: 'success',
-        text: `Shortest road route calculated: ${result.total_distance_km} km (${result.distance_meters?.toLocaleString()} m), ~${result.total_duration_minutes || 1} min via C++ Dijkstra algorithm.`,
+        text: `Optimal road route calculated: ${result.total_distance_km} km (${result.distance_meters?.toLocaleString()} m), ~${result.total_duration_minutes || 1} min.`,
       });
     } catch (err) {
+      if (currentReqId !== routeRequestIdRef.current) {
+        return;
+      }
       console.error('Route calculation failure:', err);
       setRouteError(
         err.message ||
           t('no_route_found', 'Failed to compute shortest path. Please check road network graph connectivity and retry.')
       );
     } finally {
-      setRouteLoading(false);
+      if (currentReqId === routeRequestIdRef.current) {
+        setRouteLoading(false);
+      }
     }
   };
 
@@ -968,7 +1142,7 @@ export const WorkerDashboard = () => {
                         {roadblocks.length} Active Road Closure(s) in Nashik Road Network
                       </strong>
                       <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5">
-                        The C++ Dijkstra routing engine automatically routes compactor vehicles around closed segments to ensure uninterrupted waste transport.
+                        The routing system automatically recalculates optimal paths around closed segments to ensure uninterrupted waste transport.
                       </p>
                     </div>
                   </div>
@@ -998,7 +1172,7 @@ export const WorkerDashboard = () => {
                       <Navigation className="w-5 h-5 text-emerald-500 mb-2 group-hover:scale-110 transition-transform" />
                       <div className="font-bold text-sm text-slate-900 dark:text-white">Find Shortest Path</div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        C++ Dijkstra road network planner
+                        Drivable road network planner
                       </p>
                     </button>
 
@@ -1221,10 +1395,88 @@ export const WorkerDashboard = () => {
                 </div>
 
                 {/* Step 1: Task Selection */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
-                    Step 1: Select Collection Task *
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                      Step 1: Select Collection Task *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextState = !isScannerOpen;
+                        setIsScannerOpen(nextState);
+                        if (nextState) {
+                          startCamera();
+                        } else {
+                          stopCamera();
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-700/50 transition-colors"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      {isScannerOpen ? 'Close Asset Scanner' : 'Scan Asset QR / Barcode'}
+                    </button>
+                  </div>
+
+                  {/* Camera Video Scanner Modal / Inline Box */}
+                  {isScannerOpen && (
+                    <div className="p-4 sm:p-5 bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-pulse" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                            Receptacle Tag Scanner (QR & Barcode)
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            stopCamera();
+                            setIsScannerOpen(false);
+                          }}
+                          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500"
+                          title="Close Scanner"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="relative aspect-video max-h-56 bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-700">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-amber-400/50 m-6 rounded-lg flex items-center justify-center">
+                          <div className="w-full h-0.5 bg-amber-400/80 shadow-[0_0_8px_rgba(251,191,36,0.8)] animate-pulse" />
+                        </div>
+                        {scannerMessage && (
+                          <div className="absolute bottom-2 left-2 right-2 px-2.5 py-1 bg-black/75 backdrop-blur-xs text-[11px] text-amber-300 rounded font-mono text-center">
+                            {scannerMessage}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Manual Fallback Input Form */}
+                      <form onSubmit={handleManualAssetLookup} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={manualAssetCode}
+                          onChange={(e) => setManualAssetCode(e.target.value)}
+                          placeholder="Manual code lookup (e.g. BIN-NSK-001)..."
+                          className="flex-1 px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
+                        >
+                          Match Tag
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
                   <select
                     value={selectedTaskId}
                     onChange={(e) => setSelectedTaskId(e.target.value)}
@@ -1458,10 +1710,10 @@ export const WorkerDashboard = () => {
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Route className="w-5 h-5 text-amber-500" />
-                      {t('suggested_route', 'Suggested Shortest Route — C++17 Dijkstra Algorithm')}
+                      {t('suggested_route', 'Suggested Shortest Road Route')}
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Computes the actual minimum-cost road path using Dijkstra's algorithm with priority-queue min-heap exploration across Nashik's weighted road graph.
+                      Computes the optimal drivable road path between departure and destination across Nashik's road network, automatically detouring around active roadblocks.
                     </p>
                   </div>
 
@@ -1584,10 +1836,10 @@ export const WorkerDashboard = () => {
                                     </option>
                                   ))}
                                 </optgroup>
-                                <optgroup label="Municipal Facilities">
+                                <optgroup label="Municipal Disposal & Recycling Facilities">
                                   {facilities.map((f) => (
                                     <option key={`stop-fac-${idx}-${f.id}`} value={f.id}>
-                                      {f.name}
+                                      {f.name} ({f.facilityType === 'general_waste_facility' ? 'MSW Plant' : 'E-Waste Recycler'})
                                     </option>
                                   ))}
                                 </optgroup>
@@ -1660,7 +1912,7 @@ export const WorkerDashboard = () => {
                         {routeLoading ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Calculating via C++ Dijkstra...</span>
+                            <span>Calculating optimal route...</span>
                           </>
                         ) : (
                           <>
@@ -1708,7 +1960,7 @@ export const WorkerDashboard = () => {
                         </span>
                       </div>
                       <span className="text-[11px] opacity-80">
-                        Engine: C++17 Dijkstra | Geometry: {shortestPathResult.geometry_source === 'osrm' ? 'OSRM Driving Polyline' : 'Linear Fallback'}
+                        Routing: Road Network | Geometry: {shortestPathResult.geometry_source === 'osrm' ? 'Turn-by-turn road polyline' : 'Direct node polyline'}
                       </span>
                     </div>
 
@@ -1750,9 +2002,9 @@ export const WorkerDashboard = () => {
                       </div>
 
                       <div>
-                        <span className="text-slate-400 uppercase font-semibold block text-[10px]">Algorithm & Geometry</span>
+                        <span className="text-slate-400 uppercase font-semibold block text-[10px]">Routing Mode</span>
                         <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
-                          C++17 Dijkstra
+                          Shortest Path Engine
                         </span>
                         <span className={`text-[11px] block font-semibold ${shortestPathResult.is_approximate ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {shortestPathResult.is_approximate ? 'Graph-Node Fallback' : 'OSRM Road Follower'}
@@ -1804,6 +2056,7 @@ export const WorkerDashboard = () => {
                     sourceLocation={
                       shortestPathResult?.sourceLocation
                         ? {
+                            id: shortestPathResult.sourceLocation.id,
                             lat: shortestPathResult.sourceLocation.latitude,
                             lng: shortestPathResult.sourceLocation.longitude,
                             name: shortestPathResult.sourceLocation.name,
@@ -1812,6 +2065,7 @@ export const WorkerDashboard = () => {
                           }
                         : shortestPathResult?.stops && shortestPathResult.stops.length > 0
                         ? {
+                            id: shortestPathResult.stops[0].id,
                             lat: shortestPathResult.stops[0].latitude,
                             lng: shortestPathResult.stops[0].longitude,
                             name: shortestPathResult.stops[0].name,
@@ -1820,6 +2074,7 @@ export const WorkerDashboard = () => {
                           }
                         : shortestPathResult?.sourceNode
                         ? {
+                            id: shortestPathResult.sourceNode.id,
                             lat: shortestPathResult.sourceNode.latitude,
                             lng: shortestPathResult.sourceNode.longitude,
                             name: shortestPathResult.sourceNode.name,
@@ -1831,6 +2086,7 @@ export const WorkerDashboard = () => {
                     targetLocation={
                       shortestPathResult?.targetLocation
                         ? {
+                            id: shortestPathResult.targetLocation.id,
                             lat: shortestPathResult.targetLocation.latitude,
                             lng: shortestPathResult.targetLocation.longitude,
                             name: shortestPathResult.targetLocation.name,
@@ -1839,6 +2095,7 @@ export const WorkerDashboard = () => {
                           }
                         : shortestPathResult?.stops && shortestPathResult.stops.length > 1
                         ? {
+                            id: shortestPathResult.stops[shortestPathResult.stops.length - 1].id,
                             lat: shortestPathResult.stops[shortestPathResult.stops.length - 1].latitude,
                             lng: shortestPathResult.stops[shortestPathResult.stops.length - 1].longitude,
                             name: shortestPathResult.stops[shortestPathResult.stops.length - 1].name,
@@ -1847,6 +2104,7 @@ export const WorkerDashboard = () => {
                           }
                         : shortestPathResult?.targetNode
                         ? {
+                            id: shortestPathResult.targetNode.id,
                             lat: shortestPathResult.targetNode.latitude,
                             lng: shortestPathResult.targetNode.longitude,
                             name: shortestPathResult.targetNode.name,
@@ -1859,21 +2117,28 @@ export const WorkerDashboard = () => {
                       shortestPathResult?.stops
                         ? shortestPathResult.stops
                             .filter((s) => s.type === 'waypoint')
-                            .map((s) => ({
-                              order: s.order - 1,
+                            .map((s, wIdx) => ({
+                              order: wIdx + 1,
                               lat: s.latitude,
                               lng: s.longitude,
                               name: s.name,
                               id: s.id,
-                              details: s.name,
+                              details: `Stop #${wIdx + 1}: ${s.name}`,
                             }))
                         : []
                     }
-                    intermediateNodes={
-                      shortestPathResult?.intermediateNodes && shortestPathResult.intermediateNodes.length > 2
-                        ? shortestPathResult.intermediateNodes.slice(1, -1)
-                        : []
-                    }
+                    intermediateNodes={[]}
+                    showTraversedNodes={false}
+                    facilities={facilities}
+                    showFacilities={true}
+                    onSelectSource={(item) => {
+                      handleSourceChange(item.id);
+                      setNotice({ type: 'success', text: `Selected "${item.name}" as Route Source (A).` });
+                    }}
+                    onSelectTarget={(item) => {
+                      handleTargetChange(item.id);
+                      setNotice({ type: 'success', text: `Selected "${item.name}" as Route Destination (B).` });
+                    }}
                     center={[19.9975, 73.7898]}
                     zoom={13}
                     bins={tasks.map((t) => t.bin).filter(Boolean)}
